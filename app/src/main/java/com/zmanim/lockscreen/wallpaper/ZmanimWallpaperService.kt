@@ -76,7 +76,7 @@ class ZmanimWallpaperService : WallpaperService() {
             grain.apply(Canvas(scene), width, height)
 
             canvas.drawBitmap(scene, 0f, 0f, null)
-            GlassCard.draw(canvas, scene, width, height, day)
+            GlassCard.draw(canvas, scene, width, height, day, settings.location.name)
 
             scene.recycle()
         }

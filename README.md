@@ -49,22 +49,31 @@ To work on the code:
 - **Redraw scheduling** — real: redraws every 60s, and only while the
   wallpaper is actually visible (stops when the screen is off / another app
   is in front), so it isn't burning battery in the background.
-- **Card visuals** — real vintage treatment: blurred backdrop, warm tint,
-  gold-highlighted next zman with a glow dot, dimmed past times. The blur is
-  a manual downscale/upscale trick (`GlassCard.drawBlurredBackdrop`), not
-  `RenderEffect.createBlurEffect` (API 31+ only) — chosen so it works on the
-  full minSdk 26 range; worth revisiting later if a sharper blur is wanted on
-  newer devices.
+- **Card visuals** — the full mockup layout: title + location, an analog
+  clock (real hour/minute hands from the device clock), a 7-day date strip
+  with today highlighted, a "הזמן הבא" (next zman) box, an 8-cell zmanim grid
+  with the upcoming one highlighted gold and past ones dimmed, and a
+  Shabbat-candle-lighting / Rosh-Chodesh row. All over a real blurred
+  backdrop, warm tint and border. The blur is a manual downscale/upscale
+  trick (`GlassCard.drawBlurredBackdrop`), not `RenderEffect.createBlurEffect`
+  (API 31+ only) — chosen so it works on the full minSdk 26 range.
+- **Candle lighting / Rosh Chodesh** — real: candle lighting is the upcoming
+  Friday's sunset minus 20 minutes (today's, if today is Friday); Rosh
+  Chodesh searches forward day-by-day via `JewishCalendar.isRoshChodesh`
+  (capped at 35 days) and names the month via `HebrewDateFormatter.formatMonth`
+  — both written from memory like the rest of `ZmanimProvider`, so double
+  check them the same way once CI (or Android Studio) compiles this.
 - **GPS location** — real but minimal: reads the last known location, no
   active location request/geocoded city name.
 - **App/launcher icon** — placeholder vector, not final branding.
 
-## Still missing from the mockup
+## Deliberate deviations from the mockup
 
-The full HTML mockup also had an analog clock face, a horizontal date strip,
-and a Shabbat-entry/Rosh-Chodesh row — none of those are in `GlassCard` yet
-(no clock-position or Rosh-Chodesh-countdown data in `DayZmanim` either).
-Worth a follow-up once the core look is confirmed on-device.
+- The mockup's zmanim strip was 5 icons in one row (it dropped a few times to
+  fit); this keeps all 8 real values as a 4×2 icon grid instead, so nothing
+  computed goes unshown.
+- The "tagline" flourish line under the card isn't included — decorative only,
+  easy to add back later if wanted.
 
 ## Performance note
 
