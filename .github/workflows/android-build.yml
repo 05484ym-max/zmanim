@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -31,10 +33,25 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK (per-run artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: zmanim-lockscreen-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: ignore
+
+      # Stable download link that never changes between builds: overwrites the
+      # same "nightly" release/tag every push to main, instead of a fresh
+      # per-run artifact URL each time.
+      - name: Publish stable "nightly" release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: "Nightly build"
+          prerelease: true
+          body: "Always the latest main branch build. Commit ${{ github.sha }}."
+          files: app/build/outputs/apk/debug/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
