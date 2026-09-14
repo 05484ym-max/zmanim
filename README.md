@@ -1,20 +1,23 @@
-# זמנים בנעילה — Android live wallpaper skeleton
+# זמנים בנעילה — Android live wallpaper
 
-Live wallpaper that redraws a zmanim (halachic day times) card once a minute,
-with the background shifting by time of day. This is the **structural**
-skeleton — the visuals are a plain rounded card, not the vintage design from
-the mockup. Swap `ZmanimWallpaperService.drawCard()` (and `SkyPalette`) for
-the real art direction once it's settled; everything else here stays as-is.
+Live wallpaper that redraws a zmanim (halachic day times) glass card once a
+minute, over a vintage Jerusalem-postcard scene that shifts with the time of
+day - dawn/day/dusk/night palettes, a city-wall/dome silhouette, cypress
+trees, an olive branch, film grain, and a real (cheap downscale/upscale)
+backdrop blur behind the card.
 
 ## Project layout
 
 ```
 app/src/main/java/com/zmanim/lockscreen/
-  data/      ZmanimSettings.kt      - SharedPreferences: which location is selected
-  zmanim/    ZmanimProvider.kt      - wraps the KosherJava zmanim library
-  wallpaper/ ZmanimWallpaperService.kt - the WallpaperService + Canvas rendering
-             SkyPalette.kt          - background gradient by time of day
-  ui/        SettingsActivity.kt    - city picker, GPS button, "set as wallpaper" button
+  data/      ZmanimSettings.kt          - SharedPreferences: which location is selected
+  zmanim/    ZmanimProvider.kt          - wraps the KosherJava zmanim library
+  wallpaper/ ZmanimWallpaperService.kt  - WallpaperService/Engine + redraw scheduling
+             SkyPalette.kt              - full vintage palette (sky/silhouette/dome/olive/duotone) by time of day
+             VintageScene.kt            - draws the background art
+             GrainTexture.kt            - film-grain overlay tile
+             GlassCard.kt               - blurred glass card + zmanim rows, next zman in gold
+  ui/        SettingsActivity.kt        - city picker, GPS button, "set as wallpaper" button
 ```
 
 ## Building it
@@ -46,19 +49,26 @@ To work on the code:
 - **Redraw scheduling** — real: redraws every 60s, and only while the
   wallpaper is actually visible (stops when the screen is off / another app
   is in front), so it isn't burning battery in the background.
-- **Card visuals** — placeholder. No blur, no grain, no gold accents, no
-  glassmorphism yet — just a translucent rounded rectangle with text rows, so
-  the pipeline (data → drawing) is provable before investing in the finish.
+- **Card visuals** — real vintage treatment: blurred backdrop, warm tint,
+  gold-highlighted next zman with a glow dot, dimmed past times. The blur is
+  a manual downscale/upscale trick (`GlassCard.drawBlurredBackdrop`), not
+  `RenderEffect.createBlurEffect` (API 31+ only) — chosen so it works on the
+  full minSdk 26 range; worth revisiting later if a sharper blur is wanted on
+  newer devices.
 - **GPS location** — real but minimal: reads the last known location, no
   active location request/geocoded city name.
 - **App/launcher icon** — placeholder vector, not final branding.
 
-## Next steps (design pass)
+## Still missing from the mockup
 
-Once we lock the visual direction from the mockup, `drawCard()` is where it
-lands: rounded card background → gradient/blur, add the olive-branch and
-Jerusalem-skyline background art, the analog clock, the date strip, the
-Shabbat/Rosh Chodesh row, film-grain overlay, etc. `RenderEffect.createBlurEffect`
-(API 31+) is the real backdrop-blur primitive for the glass-card look on
-device — for API 26–30 fall back to a plain translucent fill (already what
-this skeleton does).
+The full HTML mockup also had an analog clock face, a horizontal date strip,
+and a Shabbat-entry/Rosh-Chodesh row — none of those are in `GlassCard` yet
+(no clock-position or Rosh-Chodesh-countdown data in `DayZmanim` either).
+Worth a follow-up once the core look is confirmed on-device.
+
+## Performance note
+
+`ZmanimWallpaperService.render()` allocates a full-screen ARGB_8888 bitmap
+and does the blur downscale/upscale on the main thread once a minute — fine
+at that cadence, but if this ever needs to redraw more often, move that work
+to a background thread and post the finished bitmap instead.

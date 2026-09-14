@@ -1,28 +1,20 @@
 package com.zmanim.lockscreen.wallpaper
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.LinearGradient
-import android.graphics.Paint
-import android.graphics.RectF
-import android.graphics.Shader
 import android.os.Handler
 import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import com.zmanim.lockscreen.data.ZmanimSettings
-import com.zmanim.lockscreen.zmanim.DayZmanim
 import com.zmanim.lockscreen.zmanim.ZmanimProvider
 import java.util.Calendar
 
 /**
- * Draws the zmanim glass card straight onto the wallpaper Surface with Canvas/Paint - live
- * wallpapers don't host Compose, so this is intentionally plain 2D drawing. Redraws once a
- * minute (and only while actually visible) since the zmanim/date only change at that grain.
- *
- * This is the *skeleton* renderer: flat rounded rect + text rows, no blur/grain/vintage
- * treatment yet. Swap render()/drawCard() for the real art direction once it's settled -
- * everything else (scheduling, zmanim data, palette-by-time-of-day) stays as-is.
+ * Redraws the vintage zmanim glass card once a minute - Canvas/Paint only, since live
+ * wallpapers don't host Compose. The heavy lifting lives in [VintageScene] (background
+ * art), [GrainTexture] (film grain) and [GlassCard] (the blurred card + zmanim text);
+ * this class is just the WallpaperService/Engine plumbing and redraw scheduling.
  */
 class ZmanimWallpaperService : WallpaperService() {
 
@@ -32,6 +24,7 @@ class ZmanimWallpaperService : WallpaperService() {
 
         private val handler = Handler(Looper.getMainLooper())
         private var visible = false
+        private val grain = GrainTexture()
 
         private val drawRunnable = object : Runnable {
             override fun run() {
@@ -68,80 +61,24 @@ class ZmanimWallpaperService : WallpaperService() {
         }
 
         private fun render(canvas: Canvas) {
-            val width = canvas.width.toFloat()
-            val height = canvas.height.toFloat()
+            val width = canvas.width
+            val height = canvas.height
+            if (width <= 0 || height <= 0) return
 
             val settings = ZmanimSettings(this@ZmanimWallpaperService)
             val day = ZmanimProvider(settings.location).today()
+            val palette = SkyPalette.forTime(Calendar.getInstance().time, day.netzHachama, day.shkia)
 
-            drawBackground(canvas, width, height, day)
-            drawCard(canvas, width, height, day)
-        }
+            // Rendered to a bitmap first (not straight to the surface) so the card can
+            // sample a blurred copy of the scene behind it - the "frosted glass" look.
+            val scene = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            VintageScene.draw(Canvas(scene), width, height, palette)
+            grain.apply(Canvas(scene), width, height)
 
-        private fun drawBackground(canvas: Canvas, width: Float, height: Float, day: DayZmanim) {
-            val colors = SkyPalette.forTime(Calendar.getInstance().time, day.netzHachama, day.shkia)
-            val paint = Paint().apply {
-                shader = LinearGradient(0f, 0f, 0f, height, colors, null, Shader.TileMode.CLAMP)
-            }
-            canvas.drawRect(0f, 0f, width, height, paint)
-        }
+            canvas.drawBitmap(scene, 0f, 0f, null)
+            GlassCard.draw(canvas, scene, width, height, day)
 
-        private fun drawCard(canvas: Canvas, width: Float, height: Float, day: DayZmanim) {
-            val margin = width * 0.06f
-            val top = height * 0.40f
-            val cardRect = RectF(margin, top, width - margin, top + height * 0.36f)
-            val corner = 48f
-
-            val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(90, 250, 240, 219)
-                style = Paint.Style.FILL
-            }
-            canvas.drawRoundRect(cardRect, corner, corner, cardPaint)
-
-            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(140, 255, 246, 222)
-                style = Paint.Style.STROKE
-                strokeWidth = 2f
-            }
-            canvas.drawRoundRect(cardRect, corner, corner, borderPaint)
-
-            val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.rgb(0x43, 0x30, 0x1D)
-                textSize = 40f
-                textAlign = Paint.Align.CENTER
-                isFakeBoldText = true
-            }
-            canvas.drawText(day.hebrewDate, cardRect.centerX(), cardRect.top + 56f, titlePaint)
-
-            val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.rgb(0x5A, 0x3F, 0x24)
-                textSize = 32f
-                textAlign = Paint.Align.RIGHT
-            }
-            val timePaint = Paint(labelPaint).apply {
-                color = Color.rgb(0x43, 0x30, 0x1D)
-                textAlign = Paint.Align.LEFT
-                isFakeBoldText = true
-            }
-
-            val rows = listOf(
-                "עלות השחר" to day.alosHashachar,
-                "הנץ החמה" to day.netzHachama,
-                "סוף זמן ק\"ש (גר\"א)" to day.sofZmanShmaGra,
-                "חצות היום" to day.chatzos,
-                "מנחה גדולה" to day.minchaGedola,
-                "פלג המנחה" to day.plagHamincha,
-                "שקיעה" to day.shkia,
-                "צאת הכוכבים" to day.tzais
-            )
-
-            var y = cardRect.top + 110f
-            val rowHeight = (cardRect.height() - 130f) / rows.size
-            for ((label, time) in rows) {
-                canvas.drawText(label, cardRect.right - 32f, y, labelPaint)
-                canvas.drawText(ZmanimProvider.formatTime(time), cardRect.left + 32f, y, timePaint)
-                y += rowHeight
-            }
+            scene.recycle()
         }
     }
 
