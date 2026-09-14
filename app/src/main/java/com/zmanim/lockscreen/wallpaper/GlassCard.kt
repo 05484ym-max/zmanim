@@ -22,7 +22,7 @@ import java.util.Random
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Fully code-drawn antique bronze plaque. The user's wallpaper stays visible behind it. */
+/** Fully code-drawn antique bronze plaque. The user's selected wallpaper stays visible behind it. */
 object GlassCard {
     private val GOLD = Color.parseColor("#C79A4E")
     private val GOLD_LIGHT = Color.parseColor("#E8C87D")
@@ -35,12 +35,17 @@ object GlassCard {
 
     private data class ZCell(val label: String, val value: Date?)
 
+    @Suppress("UNUSED_PARAMETER")
     fun draw(canvas: Canvas, plaque: Bitmap?, width: Int, height: Int, day: DayZmanim, locationName: String) {
         val w = width.toFloat()
         val h = height.toFloat()
-        val cardW = w * .84f
-        val cardH = h * .55f
-        val rect = RectF((w - cardW) / 2f, h * .34f, (w + cardW) / 2f, h * .34f + cardH)
+
+        // Smaller than before so the plaque does not dominate the lock screen.
+        val cardW = w * .78f
+        val cardH = h * .50f
+        val top = h * .37f
+        val rect = RectF((w - cardW) / 2f, top, (w + cardW) / 2f, top + cardH)
+
         drawMetal(canvas, rect, cardW * .045f)
         drawFiligree(canvas, rect)
         drawTop(canvas, rect, day, locationName)
@@ -49,52 +54,53 @@ object GlassCard {
     }
 
     private fun drawMetal(canvas: Canvas, rect: RectF, radius: Float) {
+        // Very light shadow only; no dark overlay over the user's photo.
         val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(24, 0, 0, 0)
-            setShadowLayer(rect.width() * .014f, 0f, rect.width() * .008f, Color.argb(60, 0, 0, 0))
+            color = Color.argb(12, 0, 0, 0)
+            setShadowLayer(rect.width() * .010f, 0f, rect.width() * .006f, Color.argb(32, 0, 0, 0))
         }
-        canvas.drawRoundRect(RectF(rect.left + 2f, rect.top + 4f, rect.right + 2f, rect.bottom + 4f), radius, radius, shadow)
+        canvas.drawRoundRect(RectF(rect.left + 1f, rect.top + 2f, rect.right + 1f, rect.bottom + 2f), radius, radius, shadow)
         shadow.clearShadowLayer()
 
-        // Lower alpha than before so the lock-screen photo remains clearly visible.
+        // Much more transparent bronze so the selected lock-screen photo remains clearly visible.
         val base = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
                 rect.left, rect.top, rect.right, rect.bottom,
                 intArrayOf(
-                    Color.argb(118, 126, 86, 43),
-                    Color.argb(110, 83, 53, 27),
-                    Color.argb(104, 43, 27, 16)
+                    Color.argb(82, 126, 86, 43),
+                    Color.argb(76, 83, 53, 27),
+                    Color.argb(70, 43, 27, 16)
                 ),
                 floatArrayOf(0f, .52f, 1f), Shader.TileMode.CLAMP
             )
         }
         canvas.drawRoundRect(rect, radius, radius, base)
 
-        // Antique hammered/brushed bronze texture, deliberately faint so it does not mask the wallpaper.
+        // Faint antique metal grain that does not hide the background image.
         canvas.save()
         val clip = Path().apply { addRoundRect(rect, radius, radius, Path.Direction.CW) }
         canvas.clipPath(clip)
         val rnd = Random(1776L)
         val grain = Paint(Paint.ANTI_ALIAS_FLAG)
-        repeat(320) {
+        repeat(240) {
             val x = rect.left + rnd.nextFloat() * rect.width()
             val y = rect.top + rnd.nextFloat() * rect.height()
-            val rr = rect.width() * (.0012f + rnd.nextFloat() * .0032f)
-            grain.color = if (rnd.nextBoolean()) Color.argb(9, 255, 220, 150) else Color.argb(10, 24, 11, 4)
-            canvas.drawOval(RectF(x - rr * 2.1f, y - rr, x + rr * 2.1f, y + rr), grain)
+            val rr = rect.width() * (.0012f + rnd.nextFloat() * .003f)
+            grain.color = if (rnd.nextBoolean()) Color.argb(6, 255, 220, 150) else Color.argb(7, 24, 11, 4)
+            canvas.drawOval(RectF(x - rr * 2f, y - rr, x + rr * 2f, y + rr), grain)
         }
-        repeat(62) {
+        repeat(45) {
             val x = rect.left + rnd.nextFloat() * rect.width()
             val y = rect.top + rnd.nextFloat() * rect.height()
-            grain.color = Color.argb(10, 236, 190, 110)
-            grain.strokeWidth = rect.width() * .0006f
-            canvas.drawLine(x, y, x + rect.width() * (.02f + rnd.nextFloat() * .05f), y + rnd.nextFloat() * 2.6f - 1.3f, grain)
+            grain.color = Color.argb(6, 236, 190, 110)
+            grain.strokeWidth = rect.width() * .00055f
+            canvas.drawLine(x, y, x + rect.width() * (.02f + rnd.nextFloat() * .04f), y + rnd.nextFloat() * 2f - 1f, grain)
         }
         canvas.restore()
 
         val outer = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = rect.width() * .010f
+            strokeWidth = rect.width() * .009f
             shader = LinearGradient(
                 rect.left, rect.top, rect.right, rect.bottom,
                 intArrayOf(GOLD_LIGHT, GOLD, GOLD_DARK, GOLD_LIGHT), null, Shader.TileMode.CLAMP
@@ -104,16 +110,16 @@ object GlassCard {
 
         val secondRim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = rect.width() * .0034f
-            color = Color.argb(210, 111, 72, 31)
+            strokeWidth = rect.width() * .003f
+            color = Color.argb(170, 111, 72, 31)
         }
         val rimInset = rect.width() * .010f
         canvas.drawRoundRect(RectF(rect.left + rimInset, rect.top + rimInset, rect.right - rimInset, rect.bottom - rimInset), radius * .86f, radius * .86f, secondRim)
 
         val inner = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = rect.width() * .0019f
-            color = Color.argb(190, 232, 190, 107)
+            strokeWidth = rect.width() * .0017f
+            color = Color.argb(160, 232, 190, 107)
         }
         val inset = rect.width() * .020f
         canvas.drawRoundRect(RectF(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset), radius * .72f, radius * .72f, inner)
@@ -134,7 +140,7 @@ object GlassCard {
         embossRtl(canvas, day.hebrewDate, RectF(right.left, right.top + right.height() * .54f, right.right, right.top + right.height() * .73f), w * .036f, true)
 
         val p = textPaint(w * .027f, IVORY, false).apply { textAlign = Paint.Align.CENTER }
-        p.setShadowLayer(w * .003f, 0f, w * .003f, Color.argb(150, 0, 0, 0))
+        p.setShadowLayer(w * .0025f, 0f, w * .0025f, Color.argb(115, 0, 0, 0))
         canvas.drawText(day.gregorianDate, right.centerX(), right.top + right.height() * .90f, p)
     }
 
@@ -143,17 +149,17 @@ object GlassCard {
         val h = rect.height()
         val grid = RectF(rect.left + w * .055f, rect.top + h * .405f, rect.right - w * .055f, rect.top + h * .735f)
         val radius = w * .03f
-        canvas.drawRoundRect(grid, radius, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(34, 22, 13, 7) })
+        canvas.drawRoundRect(grid, radius, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(18, 22, 13, 7) })
         val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = w * .0027f
-            color = Color.argb(195, 190, 139, 70)
+            strokeWidth = w * .0025f
+            color = Color.argb(175, 190, 139, 70)
         }
         canvas.drawRoundRect(grid, radius, radius, border)
 
         val cw = grid.width() / 4f
         val ch = grid.height() / 2f
-        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(135, 166, 119, 60); strokeWidth = w * .0013f }
+        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(110, 166, 119, 60); strokeWidth = w * .0012f }
         for (c in 1 until 4) canvas.drawLine(grid.left + cw * c, grid.top, grid.left + cw * c, grid.bottom, line)
         canvas.drawLine(grid.left, grid.top + ch, grid.right, grid.top + ch, line)
 
@@ -170,7 +176,7 @@ object GlassCard {
             embossRtl(canvas, cell.label, RectF(box.left + 4f, box.top + ch * .07f, box.right - 4f, box.top + ch * .50f), cw * .16f, true)
             val tp = textPaint(cw * .215f, GOLD_LIGHT, true).apply {
                 textAlign = Paint.Align.CENTER
-                setShadowLayer(cw * .020f, 0f, cw * .014f, Color.argb(150, 0, 0, 0))
+                setShadowLayer(cw * .014f, 0f, cw * .010f, Color.argb(105, 0, 0, 0))
             }
             canvas.drawText(ZmanimProvider.formatTime(cell.value), box.centerX(), box.bottom - ch * .12f, tp)
         }
@@ -182,7 +188,7 @@ object GlassCard {
         val top = rect.top + h * .755f
         val bottom = rect.bottom - h * .055f
         val mid = top + (bottom - top) * .52f
-        val divider = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(120, 168, 119, 59); strokeWidth = w * .0012f }
+        val divider = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(95, 168, 119, 59); strokeWidth = w * .0011f }
         canvas.drawLine(rect.left + w * .13f, mid, rect.right - w * .08f, mid, divider)
 
         drawBook(canvas, rect.left + w * .18f, top + (mid - top) * .48f, w * .028f)
@@ -208,11 +214,11 @@ object GlassCard {
             shader = RadialGradient(cx, cy, r * 1.05f, intArrayOf(GOLD_LIGHT, GOLD_DARK, Color.parseColor("#3D2918")), null, Shader.TileMode.CLAMP)
         }
         canvas.drawCircle(cx, cy, r * 1.05f, bezel)
-        canvas.drawCircle(cx, cy, r * .94f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#3D2918") })
+        canvas.drawCircle(cx, cy, r * .94f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(160, 61, 41, 24) })
         val face = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - r * .2f, cy - r * .25f, r,
-                intArrayOf(Color.parseColor("#E1C27D"), Color.parseColor("#C09652"), Color.parseColor("#86602F")), null, Shader.TileMode.CLAMP
+                intArrayOf(Color.argb(225, 225, 194, 125), Color.argb(220, 192, 150, 82), Color.argb(215, 134, 96, 47)), null, Shader.TileMode.CLAMP
             )
         }
         canvas.drawCircle(cx, cy, r * .88f, face)
@@ -254,7 +260,7 @@ object GlassCard {
             val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = GOLD
                 style = Paint.Style.STROKE
-                strokeWidth = rect.width() * .004f
+                strokeWidth = rect.width() * .0036f
                 strokeCap = Paint.Cap.ROUND
             }
             val path = Path().apply {
@@ -265,7 +271,7 @@ object GlassCard {
                 cubicTo(x + sx * s * .38f, y + sy * s * .45f, x + sx * s * .18f, y + sy * s * .28f, x + sx * s * .08f, y + sy * s * .16f)
             }
             canvas.drawPath(path, p)
-            canvas.drawCircle(x + sx * s * .42f, y + sy * s * .38f, rect.width() * .006f, p)
+            canvas.drawCircle(x + sx * s * .42f, y + sy * s * .38f, rect.width() * .0055f, p)
         }
         val m = rect.width() * .026f
         one(rect.left + m, rect.top + m, 1f, 1f)
@@ -319,12 +325,11 @@ object GlassCard {
     }
 
     private fun embossRtl(canvas: Canvas, text: String, box: RectF, size: Float, bold: Boolean) {
-        // Stronger engraved/embossed antique-letter effect without adding opaque backing rectangles.
         val p = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = size
             color = GOLD_LIGHT
             typeface = if (bold) SERIF_BOLD else SERIF
-            setShadowLayer(size * .075f, size * .025f, size * .055f, Color.argb(190, 33, 18, 7))
+            setShadowLayer(size * .055f, size * .018f, size * .038f, Color.argb(135, 33, 18, 7))
         }
         val layout = StaticLayout.Builder.obtain(text, 0, text.length, p, box.width().toInt().coerceAtLeast(1))
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
