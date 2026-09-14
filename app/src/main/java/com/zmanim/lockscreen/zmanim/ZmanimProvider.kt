@@ -32,6 +32,7 @@ data class DayZmanim(
     val roshChodeshLabel: String?,
     val roshChodeshInDays: Int?,
     val parshaLabel: String?,
+    val hilulaLabel: String?,
     val dateStrip: List<DateStripDay>
 )
 
@@ -56,13 +57,9 @@ class ZmanimProvider(private val location: LocationConfig) {
         val cal = date.clone() as Calendar
         cal.timeZone = timeZone
         val czc = buildCalendar(cal)
-        val jewishCalendar = JewishCalendar(cal)
+        val jewishCalendar = JewishCalendar(cal).apply { inIsrael = true }
         val formatter = HebrewDateFormatter().apply { isHebrewFormat = true }
         val rosh = findNextRoshChodesh(cal, formatter)
-
-        val parsha = runCatching {
-            formatter.formatParsha(jewishCalendar).takeIf { it.isNotBlank() }
-        }.getOrNull()
 
         return DayZmanim(
             alosHashachar = czc.alosHashachar,
@@ -80,7 +77,8 @@ class ZmanimProvider(private val location: LocationConfig) {
             candleLighting = findCandleLighting(cal),
             roshChodeshLabel = rosh?.first,
             roshChodeshInDays = rosh?.second,
-            parshaLabel = parsha,
+            parshaLabel = findUpcomingParsha(cal, formatter),
+            hilulaLabel = findHilula(jewishCalendar),
             dateStrip = buildDateStrip(cal)
         )
     }
@@ -94,10 +92,25 @@ class ZmanimProvider(private val location: LocationConfig) {
         return Date(fridaySunset.time - CANDLE_LIGHTING_OFFSET_MS)
     }
 
+    private fun findUpcomingParsha(today: Calendar, formatter: HebrewDateFormatter): String? {
+        val shabbat = today.clone() as Calendar
+        while (shabbat.get(Calendar.DAY_OF_WEEK) != Calendar.SATURDAY) {
+            shabbat.add(Calendar.DATE, 1)
+        }
+        val jc = JewishCalendar(shabbat).apply { inIsrael = true }
+        return runCatching { formatter.formatParsha(jc).takeIf { it.isNotBlank() } }.getOrNull()
+    }
+
+    private fun findHilula(jc: JewishCalendar): String? {
+        val month = jc.jewishMonth
+        val day = jc.jewishDayOfMonth
+        return HILULOT[month to day]?.joinToString(" • ")
+    }
+
     private fun findNextRoshChodesh(today: Calendar, formatter: HebrewDateFormatter): Pair<String, Int>? {
         val cal = today.clone() as Calendar
         for (offset in 0..35) {
-            val jc = JewishCalendar(cal)
+            val jc = JewishCalendar(cal).apply { inIsrael = true }
             if (jc.isRoshChodesh) {
                 val monthName = formatter.formatMonth(jc)
                 return "ראש חודש $monthName" to offset
@@ -126,6 +139,28 @@ class ZmanimProvider(private val location: LocationConfig) {
     companion object {
         private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
         private const val CANDLE_LIGHTING_OFFSET_MS = 20 * 60 * 1000L
+
+        /**
+         * Curated common hilulot. The structure supports multiple names on the same Hebrew date
+         * and can be expanded without touching the rendering code.
+         * Jewish month numbering follows KosherJava: Nisan=1 ... Elul=6, Tishrei=7 ... Adar=12/13.
+         */
+        private val HILULOT: Map<Pair<Int, Int>, List<String>> = mapOf(
+            (7 to 18) to listOf("רבי נחמן מברסלב"),
+            (7 to 25) to listOf("רבי לוי יצחק מברדיטשוב"),
+            (8 to 15) to listOf("החזון איש"),
+            (8 to 16) to listOf("רבי שלמה קרליבך"),
+            (10 to 20) to listOf("הרמב״ם"),
+            (10 to 24) to listOf("בעל התניא"),
+            (11 to 4) to listOf("הבבא סאלי"),
+            (12 to 7) to listOf("משה רבנו"),
+            (12 to 21) to listOf("רבי אלימלך מליז׳נסק"),
+            (2 to 14) to listOf("רבי מאיר בעל הנס"),
+            (2 to 18) to listOf("רבי שמעון בר יוחאי"),
+            (2 to 26) to listOf("הרמח״ל"),
+            (4 to 3) to listOf("הרבי מליובאוויטש"),
+            (5 to 5) to listOf("האר״י הקדוש")
+        )
 
         fun formatTime(date: Date?): String = date?.let { timeFormat.format(it) } ?: "--:--"
     }
