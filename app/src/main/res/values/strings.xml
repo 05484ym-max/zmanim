@@ -3,8 +3,10 @@
     <string name="wallpaper_description">זמני היום ההלכתיים כטפט חי על מסך הנעילה</string>
 
     <string name="settings_title">זמני היום</string>
-    <string name="settings_subtitle">בחרו מיקום ואז הגדירו את הטפט החי</string>
+    <string name="settings_subtitle">בחרו מיקום, תמונת רקע ואז הגדירו את הטפט החי</string>
     <string name="settings_use_gps">אתר אותי אוטומטית</string>
+    <string name="settings_choose_background">בחר תמונת רקע ממסך הנעילה</string>
+    <string name="settings_background_saved">תמונת הרקע נשמרה</string>
     <string name="settings_set_wallpaper">הגדר כטפט חי</string>
     <string name="settings_location_updated">המיקום עודכן</string>
     <string name="settings_location_unavailable">לא נמצא מיקום אחרון, נסו שוב בעוד רגע</string>

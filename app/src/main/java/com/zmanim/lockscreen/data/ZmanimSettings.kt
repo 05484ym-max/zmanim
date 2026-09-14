@@ -20,7 +20,6 @@ object PresetLocations {
     val ALL = listOf(JERUSALEM, TEL_AVIV, HAIFA, BEER_SHEVA)
 }
 
-/** Thin SharedPreferences wrapper - swap for DataStore later if the settings screen grows. */
 class ZmanimSettings(context: Context) {
 
     private val prefs: SharedPreferences =
@@ -47,6 +46,12 @@ class ZmanimSettings(context: Context) {
                 .apply()
         }
 
+    var backgroundUri: String?
+        get() = prefs.getString(KEY_BACKGROUND_URI, null)
+        set(value) {
+            prefs.edit().putString(KEY_BACKGROUND_URI, value).apply()
+        }
+
     companion object {
         private const val PREFS_NAME = "zmanim_settings"
         private const val KEY_NAME = "location_name"
@@ -54,5 +59,6 @@ class ZmanimSettings(context: Context) {
         private const val KEY_LON = "location_lon"
         private const val KEY_ELEV = "location_elev"
         private const val KEY_TZ = "location_tz"
+        private const val KEY_BACKGROUND_URI = "background_uri"
     }
 }
