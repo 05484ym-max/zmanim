@@ -34,64 +34,65 @@ object TransparentGlassCard {
         val w = width.toFloat()
         val h = height.toFloat()
 
-        // Smaller, lighter card so the wallpaper remains dominant.
-        val card = RectF(w * 0.075f, h * 0.355f, w * 0.925f, h * 0.715f)
+        // Slightly taller card to make room for parasha + hilula without crowding.
+        val card = RectF(w * 0.075f, h * 0.35f, w * 0.925f, h * 0.745f)
         val radius = w * 0.045f
 
         drawGlass(canvas, card, radius, w)
         drawHeader(canvas, card, w, h, day, locationName)
 
         val clockCx = card.left + card.width() * 0.22f
-        val clockCy = card.top + card.height() * 0.43f
+        val clockCy = card.top + card.height() * 0.37f
         val clockR = card.width() * 0.125f
         drawClock(canvas, clockCx, clockCy, clockR)
 
-        // No "הזמן הקרוב" box. Use the free space for a clean decorative date area.
         val dateBox = RectF(
             card.left + card.width() * 0.42f,
-            card.top + card.height() * 0.25f,
+            card.top + card.height() * 0.20f,
             card.right - w * 0.035f,
-            card.top + card.height() * 0.50f
+            card.top + card.height() * 0.42f
         )
-        drawRtl(canvas, day.hebrewDate, RectF(dateBox.left, dateBox.top, dateBox.right, dateBox.top + dateBox.height() * .45f), w * .031f, IVORY, true)
+        drawRtl(
+            canvas,
+            day.hebrewDate,
+            RectF(dateBox.left, dateBox.top, dateBox.right, dateBox.top + dateBox.height() * .48f),
+            w * .031f,
+            IVORY,
+            true
+        )
         val civil = textPaint(w * .022f, IVORY_SOFT, false).apply { textAlign = Paint.Align.CENTER }
-        canvas.drawText(day.gregorianDate, dateBox.centerX(), dateBox.top + dateBox.height() * .72f, civil)
+        canvas.drawText(day.gregorianDate, dateBox.centerX(), dateBox.top + dateBox.height() * .76f, civil)
 
         val divider = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(90, 221, 191, 135)
             strokeWidth = 1.2f
         }
-        val divY = card.top + card.height() * 0.56f
+        val divY = card.top + card.height() * 0.49f
         canvas.drawLine(card.left + w * .04f, divY, card.right - w * .04f, divY, divider)
 
-        // Large 4x2 grid with readable labels and times.
+        val specialAreaHeight = h * .072f
+        val specialTop = card.bottom - specialAreaHeight
         val grid = RectF(
             card.left + w * .025f,
             divY + h * .006f,
             card.right - w * .025f,
-            card.bottom - h * .044f
+            specialTop - h * .006f
         )
         drawZmanimGrid(canvas, grid, day)
 
-        val specialTop = card.bottom - h * .038f
         canvas.drawLine(card.left + w * .04f, specialTop, card.right - w * .04f, specialTop, divider)
-        drawSpecialRow(
+        drawSpecialArea(
             canvas,
-            RectF(card.left + w * .04f, specialTop + h * .004f, card.right - w * .04f, card.bottom - h * .005f),
+            RectF(card.left + w * .035f, specialTop + h * .004f, card.right - w * .035f, card.bottom - h * .004f),
             day
         )
     }
 
     private fun drawGlass(canvas: Canvas, card: RectF, radius: Float, w: Float) {
-        // Very light fill only inside the card. No heavy shadow, no full-screen effect.
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(34, 34, 30, 26)
-        }
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(30, 34, 30, 26) }
         canvas.drawRoundRect(card, radius, radius, fill)
 
-        val softInner = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(18, 255, 248, 233)
-        }
+        val softInner = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(14, 255, 248, 233) }
         canvas.drawRoundRect(
             RectF(card.left + 4f, card.top + 4f, card.right - 4f, card.bottom - 4f),
             radius * .9f,
@@ -100,7 +101,7 @@ object TransparentGlassCard {
         )
 
         val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(150, 213, 176, 106)
+            color = Color.argb(145, 213, 176, 106)
             style = Paint.Style.STROKE
             strokeWidth = w * .0018f
         }
@@ -109,13 +110,13 @@ object TransparentGlassCard {
 
     private fun drawHeader(canvas: Canvas, card: RectF, w: Float, h: Float, day: DayZmanim, locationName: String) {
         val title = textPaint(w * .052f, IVORY, true).apply { textAlign = Paint.Align.CENTER }
-        canvas.drawText("זמני היום", card.centerX(), card.top + h * .035f, title)
+        canvas.drawText("זמני היום", card.centerX(), card.top + h * .034f, title)
 
         val ornament = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(150, 213, 176, 106)
             strokeWidth = 1.4f
         }
-        val oy = card.top + h * .043f
+        val oy = card.top + h * .042f
         val gap = w * .11f
         canvas.drawLine(card.centerX() - w * .25f, oy, card.centerX() - gap, oy, ornament)
         canvas.drawLine(card.centerX() + gap, oy, card.centerX() + w * .25f, oy, ornament)
@@ -123,7 +124,7 @@ object TransparentGlassCard {
         drawRtl(
             canvas,
             locationName,
-            RectF(card.left + w * .12f, card.top + h * .048f, card.right - w * .12f, card.top + h * .075f),
+            RectF(card.left + w * .12f, card.top + h * .047f, card.right - w * .12f, card.top + h * .073f),
             w * .027f,
             IVORY_SOFT,
             false
@@ -157,45 +158,69 @@ object TransparentGlassCard {
                 rect.top + (row + 1) * cellH
             )
 
-            // One compact RTL-safe label, then a clearly separated time.
             drawRtl(
                 canvas,
                 cell.label,
-                RectF(box.left + 6f, box.top + box.height() * .10f, box.right - 6f, box.top + box.height() * .48f),
-                cellW * .115f,
+                RectF(box.left + 6f, box.top + box.height() * .08f, box.right - 6f, box.top + box.height() * .46f),
+                cellW * .112f,
                 IVORY_SOFT,
                 false
             )
 
-            val time = textPaint(cellW * .155f, IVORY, true).apply { textAlign = Paint.Align.CENTER }
+            val time = textPaint(cellW * .15f, IVORY, true).apply { textAlign = Paint.Align.CENTER }
             canvas.drawText(
                 ZmanimProvider.formatTime(cell.value),
                 box.centerX(),
-                box.bottom - box.height() * .14f,
+                box.bottom - box.height() * .13f,
                 time
             )
         }
     }
 
-    private fun drawSpecialRow(canvas: Canvas, rect: RectF, day: DayZmanim) {
-        val left = RectF(rect.left, rect.top, rect.centerX() - 4f, rect.bottom)
-        val right = RectF(rect.centerX() + 4f, rect.top, rect.right, rect.bottom)
+    private fun drawSpecialArea(canvas: Canvas, rect: RectF, day: DayZmanim) {
+        val topRowBottom = rect.top + rect.height() * .54f
+        val midX = rect.centerX()
+        val sep = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(48, 235, 220, 195)
+            strokeWidth = 1f
+        }
+
+        // First row: candle lighting + this week's parasha.
+        val left = RectF(rect.left, rect.top, midX - 4f, topRowBottom)
+        val right = RectF(midX + 4f, rect.top, rect.right, topRowBottom)
+        canvas.drawLine(midX, rect.top + 2f, midX, topRowBottom - 2f, sep)
 
         drawRtl(
             canvas,
             "כניסת שבת  ${ZmanimProvider.formatTime(day.candleLighting)}",
             left,
-            rect.width() * .032f,
+            rect.width() * .030f,
             IVORY,
             true
         )
 
-        val special = when {
-            !day.roshChodeshLabel.isNullOrBlank() -> day.roshChodeshLabel
-            !day.parshaLabel.isNullOrBlank() -> "פרשת ${day.parshaLabel}"
-            else -> "שבת שלום"
+        val parsha = day.parshaLabel?.takeIf { it.isNotBlank() }?.let { "פרשת השבוע: $it" } ?: "פרשת השבוע"
+        drawRtl(canvas, parsha, right, rect.width() * .029f, GOLD, true)
+
+        // Second row: daily hilula, only when the date exists in the curated database.
+        val hilulaBox = RectF(rect.left, topRowBottom, rect.right, rect.bottom)
+        if (!day.hilulaLabel.isNullOrBlank()) {
+            canvas.drawLine(rect.left + rect.width() * .04f, topRowBottom, rect.right - rect.width() * .04f, topRowBottom, sep)
+            drawRtl(
+                canvas,
+                "הילולת היום: ${day.hilulaLabel}",
+                hilulaBox,
+                rect.width() * .027f,
+                IVORY_SOFT,
+                true
+            )
+        } else {
+            val fallback = day.roshChodeshLabel?.takeIf { it.isNotBlank() } ?: ""
+            if (fallback.isNotBlank()) {
+                canvas.drawLine(rect.left + rect.width() * .04f, topRowBottom, rect.right - rect.width() * .04f, topRowBottom, sep)
+                drawRtl(canvas, fallback, hilulaBox, rect.width() * .027f, IVORY_SOFT, true)
+            }
         }
-        drawRtl(canvas, special ?: "", right, rect.width() * .032f, GOLD, true)
     }
 
     private fun entries(day: DayZmanim): List<ZCell> = listOf(
@@ -265,13 +290,7 @@ object TransparentGlassCard {
             strokeWidth = stroke
             strokeCap = Paint.Cap.ROUND
         }
-        canvas.drawLine(
-            cx,
-            cy,
-            cx + length * cos(a).toFloat(),
-            cy + length * sin(a).toFloat(),
-            p
-        )
+        canvas.drawLine(cx, cy, cx + length * cos(a).toFloat(), cy + length * sin(a).toFloat(), p)
     }
 
     private fun drawRtl(
@@ -293,7 +312,7 @@ object TransparentGlassCard {
             .setTextDirection(TextDirectionHeuristics.RTL)
             .setIncludePad(false)
             .setMaxLines(2)
-            .setLineSpacing(0f, 0.92f)
+            .setLineSpacing(0f, 0.94f)
             .build()
 
         canvas.save()
