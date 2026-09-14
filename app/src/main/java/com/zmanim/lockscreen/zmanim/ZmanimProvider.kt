@@ -27,20 +27,14 @@ data class DayZmanim(
     val shkia: Date?,
     val tzais: Date?,
     val hebrewDate: String,
-    /** Candle lighting for the upcoming Friday (today's, if today is Friday) - always present. */
+    val gregorianDate: String,
     val candleLighting: Date?,
     val roshChodeshLabel: String?,
-    /** Days until the next Rosh Chodesh; 0 = today. */
     val roshChodeshInDays: Int?,
-    /** 7 days centered on today (3 before, today, 3 after), for the date-strip UI. */
+    val parshaLabel: String?,
     val dateStrip: List<DateStripDay>
 )
 
-/**
- * Wraps the KosherJava zmanim library (https://github.com/KosherJava/zmanim) for one location.
- * NOTE: verify the exact method/constructor names against the pinned library version's javadoc
- * once this is opened in Android Studio - written from memory, checked only by CI compilation.
- */
 class ZmanimProvider(private val location: LocationConfig) {
 
     private val timeZone: TimeZone get() = TimeZone.getTimeZone(location.timeZoneId)
@@ -56,14 +50,19 @@ class ZmanimProvider(private val location: LocationConfig) {
         return ComplexZmanimCalendar(geoLocation).apply { calendar = forDate }
     }
 
-    fun today(): DayZmanim {
-        val cal = Calendar.getInstance(timeZone)
-        val czc = buildCalendar(cal)
+    fun today(): DayZmanim = forDate(Calendar.getInstance(timeZone))
 
+    fun forDate(date: Calendar): DayZmanim {
+        val cal = date.clone() as Calendar
+        cal.timeZone = timeZone
+        val czc = buildCalendar(cal)
         val jewishCalendar = JewishCalendar(cal)
         val formatter = HebrewDateFormatter().apply { isHebrewFormat = true }
-
         val rosh = findNextRoshChodesh(cal, formatter)
+
+        val parsha = runCatching {
+            formatter.formatParsha(jewishCalendar).takeIf { it.isNotBlank() }
+        }.getOrNull()
 
         return DayZmanim(
             alosHashachar = czc.alosHashachar,
@@ -75,9 +74,13 @@ class ZmanimProvider(private val location: LocationConfig) {
             shkia = czc.sunset,
             tzais = czc.tzais,
             hebrewDate = formatter.format(jewishCalendar),
+            gregorianDate = SimpleDateFormat("MMMM d, yyyy", Locale.ENGLISH).apply {
+                timeZone = this@ZmanimProvider.timeZone
+            }.format(cal.time),
             candleLighting = findCandleLighting(cal),
             roshChodeshLabel = rosh?.first,
             roshChodeshInDays = rosh?.second,
+            parshaLabel = parsha,
             dateStrip = buildDateStrip(cal)
         )
     }
@@ -109,7 +112,7 @@ class ZmanimProvider(private val location: LocationConfig) {
         val cal = today.clone() as Calendar
         cal.add(Calendar.DATE, -3)
         return (0 until 7).map { i ->
-            val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK) // Calendar.SUNDAY(1)..Calendar.SATURDAY(7)
+            val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
             val day = DateStripDay(
                 hebrewLetter = letters[dayOfWeek - 1],
                 dayOfMonth = cal.get(Calendar.DAY_OF_MONTH),
