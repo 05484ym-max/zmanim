@@ -1,284 +1,387 @@
 package com.zmanim.lockscreen.wallpaper
 
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
 import android.graphics.RectF
-import android.graphics.Typeface
+import android.graphics.Shader
 import com.zmanim.lockscreen.zmanim.DayZmanim
 import com.zmanim.lockscreen.zmanim.ZmanimProvider
 import java.util.Calendar
 import java.util.Date
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.random.Random
 
-/** Compact parchment card modeled after the approved lock-screen mockup. */
+/**
+ * Engraved brass/bronze plaque card - matches the approved reference image: analog clock
+ * top-left, title/location/date block top-right, an 8-cell zmanim grid, a weekly-parsha
+ * line and a daily-hilula line. Fully opaque (no backdrop blur needed, unlike the earlier
+ * glass-card iterations), which is also why a 1-second redraw for the live second hand is
+ * cheap - see ZmanimWallpaperService for the day-data caching that makes that affordable.
+ */
 object GlassCard {
-    private val PAPER = Color.parseColor("#F4E5C3")
-    private val PAPER_DARK = Color.parseColor("#E6CF9B")
-    private val INK = Color.parseColor("#3B2818")
-    private val INK_SOFT = Color.parseColor("#694A2C")
-    private val BRONZE = Color.parseColor("#8A5E2A")
-    private val GOLD = Color.parseColor("#B9853B")
-    private val RED = Color.parseColor("#A33B2B")
 
-    private data class ZCell(val label: String, val value: Date?)
+    private val PLAQUE_LIGHT = Color.parseColor("#3C2A16")
+    private val PLAQUE_BASE = Color.parseColor("#2A1D10")
+    private val PLAQUE_DARK = Color.parseColor("#1C1209")
+    private val GOLD = Color.parseColor("#E7C374")
+    private val GOLD_DIM = Color.parseColor("#B99248")
+    private val SHADOW = Color.parseColor("#140D05")
+    private val HIGHLIGHT = Color.parseColor("#FFEFC4")
 
-    fun draw(
-        canvas: Canvas,
-        background: Bitmap,
-        width: Int,
-        height: Int,
-        day: DayZmanim,
-        locationName: String,
-        isBrowsing: Boolean = false
-    ) {
+    private data class Cell(val label: String, val time: Date?)
+
+    fun draw(canvas: Canvas, width: Int, height: Int, day: DayZmanim, locationName: String) {
         val w = width.toFloat()
         val h = height.toFloat()
-        val cardW = w * 0.74f
-        val cardH = h * 0.42f
+        val cardW = w * 0.86f
+        val cardH = (cardW * 1.28f).coerceAtMost(h * 0.62f)
         val left = (w - cardW) / 2f
-        val top = h * 0.365f
+        val top = h * 0.16f
         val rect = RectF(left, top, left + cardW, top + cardH)
-        val radius = w * 0.035f
+        val corner = w * 0.045f
 
-        drawShadow(canvas, rect, radius)
-        drawParchment(canvas, rect, radius)
-        drawOrnateBorder(canvas, rect, radius)
-        drawContent(canvas, rect, day, locationName, isBrowsing)
+        drawShadowDrop(canvas, rect, corner)
+        drawPlaqueBase(canvas, rect, corner)
+        drawHammeredTexture(canvas, rect)
+        drawBevelBorder(canvas, rect, corner)
+        drawCorners(canvas, rect)
+        drawContent(canvas, rect, day, locationName)
     }
 
-    private fun drawShadow(canvas: Canvas, rect: RectF, radius: Float) {
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(90, 38, 20, 8)
-            setShadowLayer(24f, 0f, 12f, Color.argb(120, 25, 14, 5))
+    // ---------- plaque base ----------
+
+    private fun drawShadowDrop(canvas: Canvas, rect: RectF, corner: Float) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(110, 10, 6, 2) }
+        canvas.drawRoundRect(RectF(rect.left + 4f, rect.top + 14f, rect.right + 4f, rect.bottom + 14f), corner, corner, paint)
+    }
+
+    private fun drawPlaqueBase(canvas: Canvas, rect: RectF, corner: Float) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                rect.left, rect.top, rect.right, rect.bottom,
+                intArrayOf(PLAQUE_LIGHT, PLAQUE_BASE, PLAQUE_DARK),
+                floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP
+            )
         }
-        canvas.drawRoundRect(RectF(rect.left + 3f, rect.top + 8f, rect.right + 3f, rect.bottom + 8f), radius, radius, p)
-        p.clearShadowLayer()
+        canvas.drawRoundRect(rect, corner, corner, paint)
     }
 
-    private fun drawParchment(canvas: Canvas, rect: RectF, radius: Float) {
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = PAPER }
-        canvas.drawRoundRect(rect, radius, radius, p)
-
-        val wash = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(28, 139, 91, 39) }
-        canvas.drawRoundRect(RectF(rect.left + 6f, rect.top + 6f, rect.right - 6f, rect.bottom - 6f), radius * .85f, radius * .85f, wash)
-
-        val grain = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(25, 80, 45, 20); strokeWidth = 1f }
-        val step = (rect.width() / 34f).coerceAtLeast(8f)
-        var x = rect.left + step
-        var i = 0
-        while (x < rect.right - step) {
-            val y = rect.top + ((i * 37) % 97) / 97f * rect.height()
-            canvas.drawCircle(x, y, 0.7f + (i % 3) * 0.35f, grain)
-            x += step
-            i++
+    private fun drawHammeredTexture(canvas: Canvas, rect: RectF) {
+        val rnd = Random(11)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        canvas.save()
+        val clip = Path().apply { addRoundRect(rect, rect.width() * 0.045f, rect.width() * 0.045f, Path.Direction.CW) }
+        canvas.clipPath(clip)
+        repeat(160) {
+            val x = rect.left + rnd.nextFloat() * rect.width()
+            val y = rect.top + rnd.nextFloat() * rect.height()
+            val r = rect.width() * (0.008f + rnd.nextFloat() * 0.014f)
+            paint.color = if (rnd.nextBoolean()) Color.argb(16, 255, 220, 160) else Color.argb(24, 10, 6, 2)
+            canvas.drawCircle(x, y, r, paint)
         }
+        canvas.restore()
     }
 
-    private fun drawOrnateBorder(canvas: Canvas, rect: RectF, radius: Float) {
+    private fun drawBevelBorder(canvas: Canvas, rect: RectF, corner: Float) {
         val outer = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = BRONZE; style = Paint.Style.STROKE; strokeWidth = 2.4f
+            style = Paint.Style.STROKE
+            strokeWidth = rect.width() * 0.013f
+            shader = LinearGradient(
+                rect.left, rect.top, rect.right, rect.bottom,
+                intArrayOf(Color.parseColor("#F3D48A"), Color.parseColor("#8A6425"), Color.parseColor("#F3D48A")),
+                null, Shader.TileMode.CLAMP
+            )
         }
-        canvas.drawRoundRect(rect, radius, radius, outer)
-        val innerRect = RectF(rect.left + 7f, rect.top + 7f, rect.right - 7f, rect.bottom - 7f)
-        val inner = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(125, 111, 72, 34); style = Paint.Style.STROKE; strokeWidth = 1f
-        }
-        canvas.drawRoundRect(innerRect, radius * .76f, radius * .76f, inner)
+        canvas.drawRoundRect(rect, corner, corner, outer)
 
-        val flourish = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BRONZE; strokeWidth = 1.6f }
-        val y = rect.top + rect.height() * .105f
-        val cx = rect.centerX()
-        canvas.drawLine(cx - rect.width() * .24f, y, cx - rect.width() * .10f, y, flourish)
-        canvas.drawLine(cx + rect.width() * .10f, y, cx + rect.width() * .24f, y, flourish)
-        canvas.drawCircle(cx - rect.width() * .09f, y, 2.2f, flourish)
-        canvas.drawCircle(cx + rect.width() * .09f, y, 2.2f, flourish)
+        val inset = rect.width() * 0.02f
+        val innerRect = RectF(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset)
+        val inner = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = rect.width() * 0.004f
+            color = Color.argb(160, 60, 40, 14)
+        }
+        canvas.drawRoundRect(innerRect, corner * 0.85f, corner * 0.85f, inner)
     }
 
-    private fun drawContent(canvas: Canvas, rect: RectF, day: DayZmanim, locationName: String, isBrowsing: Boolean) {
+    private fun drawCorners(canvas: Canvas, rect: RectF) {
+        val size = rect.width() * 0.11f
+        val inset = rect.width() * 0.035f
+        drawCornerFlourish(canvas, rect.left + inset, rect.top + inset, size, mirrorX = false, mirrorY = false)
+        drawCornerFlourish(canvas, rect.right - inset, rect.top + inset, size, mirrorX = true, mirrorY = false)
+        drawCornerFlourish(canvas, rect.left + inset, rect.bottom - inset, size, mirrorX = false, mirrorY = true)
+        drawCornerFlourish(canvas, rect.right - inset, rect.bottom - inset, size, mirrorX = true, mirrorY = true)
+    }
+
+    private fun drawCornerFlourish(canvas: Canvas, cx: Float, cy: Float, size: Float, mirrorX: Boolean, mirrorY: Boolean) {
+        canvas.save()
+        canvas.translate(cx, cy)
+        canvas.scale(if (mirrorX) -1f else 1f, if (mirrorY) -1f else 1f)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = GOLD_DIM; style = Paint.Style.STROKE
+            strokeWidth = size * 0.07f; strokeCap = Paint.Cap.ROUND
+        }
+        canvas.drawPath(Path().apply { moveTo(0f, size); quadTo(0f, 0f, size, 0f) }, paint)
+        canvas.drawPath(
+            Path().apply { moveTo(size * 0.18f, size * 0.82f); quadTo(size * 0.18f, size * 0.18f, size * 0.82f, size * 0.18f) },
+            paint
+        )
+        val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = GOLD_DIM }
+        canvas.drawCircle(size * 0.18f, size * 0.82f, size * 0.05f, dot)
+        canvas.drawCircle(size * 0.82f, size * 0.18f, size * 0.05f, dot)
+        canvas.restore()
+    }
+
+    // ---------- content ----------
+
+    private fun drawContent(canvas: Canvas, rect: RectF, day: DayZmanim, locationName: String) {
         val w = rect.width()
         val h = rect.height()
 
-        val title = paint(w * .060f, INK, Paint.Align.CENTER, bold = true)
-        canvas.drawText("זמני היום", rect.centerX(), rect.top + h * .087f, title)
-
-        val small = paint(w * .023f, INK_SOFT, Paint.Align.CENTER)
-        canvas.drawText(locationName, rect.left + w * .11f, rect.top + h * .08f, small)
-        canvas.drawText("תורה תמיד", rect.right - w * .11f, rect.top + h * .08f, small)
-
-        val heb = paint(w * .035f, INK, Paint.Align.CENTER, bold = true)
-        canvas.drawText(day.hebrewDate, rect.centerX(), rect.top + h * .155f, heb)
-        val civil = paint(w * .025f, INK_SOFT, Paint.Align.CENTER)
-        canvas.drawText(day.gregorianDate, rect.centerX(), rect.top + h * .19f, civil)
-
-        val arrow = paint(w * .055f, INK_SOFT, Paint.Align.CENTER)
-        canvas.drawText("‹", rect.left + w * .19f, rect.top + h * .17f, arrow)
-        canvas.drawText("›", rect.right - w * .19f, rect.top + h * .17f, arrow)
-        if (isBrowsing) {
-            val browse = paint(w * .018f, GOLD, Paint.Align.CENTER, bold = true)
-            canvas.drawText("דפדוף בתאריך", rect.centerX(), rect.top + h * .218f, browse)
-        }
-
-        val mainTop = rect.top + h * .235f
-        val mainBottom = rect.top + h * .555f
-        val clockCx = rect.left + w * .25f
-        val clockCy = (mainTop + mainBottom) / 2f
-        val clockR = h * .145f
+        val clockCx = rect.left + w * 0.255f
+        val clockCy = rect.top + h * 0.165f
+        val clockR = w * 0.195f
         drawClock(canvas, clockCx, clockCy, clockR)
 
-        val nextRect = RectF(rect.left + w * .48f, mainTop + h * .015f, rect.right - w * .055f, mainBottom - h * .015f)
-        drawNext(canvas, nextRect, day)
+        val textCx = rect.left + w * 0.725f
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER; textSize = w * 0.078f; isFakeBoldText = true
+        }
+        embossText(canvas, "זמני היום", textCx, rect.top + h * 0.075f, titlePaint)
 
-        val dividerY = rect.top + h * .59f
-        drawDivider(canvas, rect.left + w * .055f, rect.right - w * .055f, dividerY)
+        drawPinIcon(canvas, textCx - w * 0.10f, rect.top + h * 0.125f, w * 0.018f, GOLD)
+        val placePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; textSize = w * 0.042f }
+        embossText(canvas, locationName, textCx + w * 0.02f, rect.top + h * 0.135f, placePaint)
 
-        val gridRect = RectF(rect.left + w * .055f, dividerY + h * .018f, rect.right - w * .055f, rect.top + h * .79f)
-        drawZmanimStrip(canvas, gridRect, day)
+        val hebPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER; textSize = w * 0.05f; isFakeBoldText = true
+        }
+        embossText(canvas, day.hebrewDate, textCx, rect.top + h * 0.205f, hebPaint)
 
-        val bottomY = rect.top + h * .815f
-        drawDivider(canvas, rect.left + w * .055f, rect.right - w * .055f, bottomY)
-        val bottomRect = RectF(rect.left + w * .07f, bottomY + h * .02f, rect.right - w * .07f, rect.bottom - h * .035f)
-        drawSpecialRow(canvas, bottomRect, day)
+        val gregPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; textSize = w * 0.032f }
+        embossText(canvas, day.gregorianDate, textCx, rect.top + h * 0.245f, gregPaint)
+
+        val divider1Y = rect.top + h * 0.315f
+        drawDivider(canvas, rect, divider1Y)
+
+        val gridRect = RectF(rect.left + w * 0.05f, divider1Y + h * 0.02f, rect.right - w * 0.05f, rect.top + h * 0.615f)
+        drawGrid(canvas, gridRect, day)
+
+        val divider2Y = rect.top + h * 0.635f
+        drawDivider(canvas, rect, divider2Y)
+
+        val parshaText = day.parshaLabel?.let { "פרשת השבוע: $it" } ?: "פרשת השבוע"
+        val parshaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; textSize = w * 0.037f }
+        drawBookIcon(canvas, rect.centerX() - parshaPaint.measureText(parshaText) / 2f - w * 0.05f, rect.top + h * 0.685f, w * 0.022f, GOLD)
+        embossText(canvas, parshaText, rect.centerX(), rect.top + h * 0.695f, parshaPaint)
+
+        val divider3Y = rect.top + h * 0.735f
+        drawDivider(canvas, rect, divider3Y, thin = true)
+
+        val hilulaText = day.hilulaLabel?.let { "הילולת היום: $it" }
+            ?: day.roshChodeshLabel?.let { label ->
+                when (day.roshChodeshInDays) {
+                    0 -> "$label · היום"
+                    1 -> "$label · מחר"
+                    else -> "$label · בעוד ${day.roshChodeshInDays} ימים"
+                }
+            }
+        if (hilulaText != null) {
+            val hilulaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; textSize = w * 0.034f }
+            drawCandlesIcon(
+                canvas, rect.centerX() - hilulaPaint.measureText(hilulaText) / 2f - w * 0.055f,
+                rect.top + h * 0.785f, w * 0.02f, GOLD
+            )
+            embossText(canvas, hilulaText, rect.centerX(), rect.top + h * 0.795f, hilulaPaint)
+        }
     }
 
+    private fun drawDivider(canvas: Canvas, rect: RectF, y: Float, thin: Boolean = false) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (thin) Color.argb(90, 185, 146, 72) else Color.argb(140, 185, 146, 72)
+            strokeWidth = if (thin) 1f else 1.6f
+        }
+        canvas.drawLine(rect.left + rect.width() * 0.06f, y, rect.right - rect.width() * 0.06f, y, paint)
+    }
+
+    // ---------- grid ----------
+
+    private fun drawGrid(canvas: Canvas, rect: RectF, day: DayZmanim) {
+        // Exact left-to-right cell order from the approved reference image.
+        val topRow = listOf(
+            Cell("סוף זמן ש\"מ", day.sofZmanShmaGra),
+            Cell("זריחה", day.netzHachama),
+            Cell("תפילין", day.sofZmanTefila),
+            Cell("עלות השחר", day.alosHashachar)
+        )
+        val bottomRow = listOf(
+            Cell("צאת הכוכבים", day.tzais),
+            Cell("שקיעה", day.shkia),
+            Cell("מנחה קטנה", day.minchaKetana),
+            Cell("מנחה גדולה", day.minchaGedola)
+        )
+        val cols = 4
+        val colW = rect.width() / cols
+        val rowH = rect.height() / 2f
+
+        val cellBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(120, 20, 13, 6) }
+        canvas.drawRect(rect, cellBg)
+
+        val gridLine = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 185, 146, 72); strokeWidth = 1f }
+        for (c in 1 until cols) {
+            val x = rect.left + colW * c
+            canvas.drawLine(x, rect.top, x, rect.bottom, gridLine)
+        }
+        canvas.drawLine(rect.left, rect.top + rowH, rect.right, rect.top + rowH, gridLine)
+        canvas.drawRect(
+            rect,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.argb(90, 185, 146, 72); strokeWidth = 1.4f }
+        )
+
+        fun drawRow(cells: List<Cell>, rowTop: Float) {
+            cells.forEachIndexed { col, cell ->
+                val cx = rect.left + colW * col + colW / 2f
+                val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; textSize = colW * 0.155f }
+                embossText(canvas, cell.label, cx, rowTop + rowH * 0.36f, labelPaint)
+                val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    textAlign = Paint.Align.CENTER; textSize = colW * 0.20f; isFakeBoldText = true
+                }
+                embossText(canvas, ZmanimProvider.formatTime(cell.time), cx, rowTop + rowH * 0.72f, timePaint)
+            }
+        }
+        drawRow(topRow, rect.top)
+        drawRow(bottomRow, rect.top + rowH)
+    }
+
+    // ---------- clock ----------
+
     private fun drawClock(canvas: Canvas, cx: Float, cy: Float, r: Float) {
-        val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(35, 72, 42, 18) }
-        canvas.drawCircle(cx + 3f, cy + 5f, r * 1.03f, shadow)
-
-        val ring1 = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BRONZE; style = Paint.Style.STROKE; strokeWidth = r * .075f }
-        canvas.drawCircle(cx, cy, r, ring1)
-        val ring2 = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = GOLD; style = Paint.Style.STROKE; strokeWidth = r * .025f }
-        canvas.drawCircle(cx, cy, r * .92f, ring2)
-        val face = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F7EBCF") }
-        canvas.drawCircle(cx, cy, r * .88f, face)
-
-        val tick = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = INK_SOFT; strokeWidth = r * .012f }
-        for (i in 0 until 60) {
-            val a = Math.toRadians((i * 6 - 90).toDouble())
-            val outer = r * .84f
-            val inner = if (i % 5 == 0) r * .75f else r * .80f
-            canvas.drawLine(
-                cx + inner * cos(a).toFloat(), cy + inner * sin(a).toFloat(),
-                cx + outer * cos(a).toFloat(), cy + outer * sin(a).toFloat(), tick
+        val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; strokeWidth = r * 0.16f
+            shader = LinearGradient(
+                cx - r, cy - r, cx + r, cy + r,
+                intArrayOf(Color.parseColor("#F2D98A"), Color.parseColor("#9C7326"), Color.parseColor("#F2D98A")),
+                null, Shader.TileMode.CLAMP
             )
         }
+        canvas.drawCircle(cx, cy, r * 0.9f, ring)
 
-        val num = paint(r * .22f, INK, Paint.Align.CENTER)
-        for (n in 1..12) {
-            val a = Math.toRadians((n * 30 - 90).toDouble())
-            val nr = r * .61f
-            val x = cx + nr * cos(a).toFloat()
-            val y = cy + nr * sin(a).toFloat() + num.textSize * .34f
-            canvas.drawText(n.toString(), x, y, num)
+        val face = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#E9CE8E") }
+        canvas.drawCircle(cx, cy, r * 0.78f, face)
+        val faceShade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx - r * 0.2f, cy - r * 0.2f, r * 1.1f,
+                Color.argb(70, 255, 245, 210), Color.argb(50, 120, 85, 30), Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawCircle(cx, cy, r * 0.78f, faceShade)
+
+        val tick = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(170, 60, 40, 12); strokeWidth = r * 0.02f }
+        for (i in 0 until 12) {
+            val a = Math.toRadians((i * 30 - 90).toDouble())
+            val outerP = r * 0.72f
+            val innerP = if (i % 3 == 0) r * 0.58f else r * 0.66f
+            canvas.drawLine(
+                cx + innerP * cos(a).toFloat(), cy + innerP * sin(a).toFloat(),
+                cx + outerP * cos(a).toFloat(), cy + outerP * sin(a).toFloat(), tick
+            )
+        }
+        val numPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#3B2818"); textAlign = Paint.Align.CENTER
+            textSize = r * 0.26f; isFakeBoldText = true
+        }
+        listOf(12 to 0, 3 to 90, 6 to 180, 9 to 270).forEach { (num, deg) ->
+            val a = Math.toRadians((deg - 90).toDouble())
+            val nx = cx + r * 0.5f * cos(a).toFloat()
+            val ny = cy + r * 0.5f * sin(a).toFloat() + numPaint.textSize * 0.32f
+            canvas.drawText(num.toString(), nx, ny, numPaint)
         }
 
         val now = Calendar.getInstance()
-        val sec = now.get(Calendar.SECOND)
-        val min = now.get(Calendar.MINUTE) + sec / 60f
-        val hour = now.get(Calendar.HOUR) + min / 60f
-        hand(canvas, cx, cy, r * .48f, hour * 30f - 90f, r * .055f, INK)
-        hand(canvas, cx, cy, r * .68f, min * 6f - 90f, r * .035f, INK_SOFT)
-        hand(canvas, cx, cy, r * .77f, sec * 6f - 90f, r * .013f, RED)
-        canvas.drawCircle(cx, cy, r * .07f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = GOLD })
-        canvas.drawCircle(cx, cy, r * .035f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = INK })
+        val second = now.get(Calendar.SECOND)
+        val minute = now.get(Calendar.MINUTE) + second / 60f
+        val hour = now.get(Calendar.HOUR) + minute / 60f
+
+        drawHand(canvas, cx, cy, r * 0.42f, hour * 30f, r * 0.05f, Color.parseColor("#241708"))
+        drawHand(canvas, cx, cy, r * 0.60f, minute * 6f, r * 0.035f, Color.parseColor("#241708"))
+        drawHand(canvas, cx, cy, r * 0.65f, second * 6f, r * 0.012f, Color.parseColor("#B23A2B"))
+
+        canvas.drawCircle(cx, cy, r * 0.045f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#241708") })
+        canvas.drawCircle(cx, cy, r * 0.02f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#B23A2B") })
     }
 
-    private fun hand(canvas: Canvas, cx: Float, cy: Float, length: Float, deg: Float, stroke: Float, color: Int) {
-        val a = Math.toRadians(deg.toDouble())
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color; strokeWidth = stroke; strokeCap = Paint.Cap.ROUND }
-        canvas.drawLine(cx, cy, cx + length * cos(a).toFloat(), cy + length * sin(a).toFloat(), p)
+    private fun drawHand(canvas: Canvas, cx: Float, cy: Float, length: Float, deg: Float, stroke: Float, color: Int) {
+        val a = Math.toRadians((deg - 90).toDouble())
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color; strokeWidth = stroke; strokeCap = Paint.Cap.ROUND }
+        canvas.drawLine(cx, cy, cx + length * cos(a).toFloat(), cy + length * sin(a).toFloat(), paint)
     }
 
-    private fun drawNext(canvas: Canvas, rect: RectF, day: DayZmanim) {
-        val entries = entries(day)
-        val now = Date()
-        val next = entries.firstOrNull { it.value != null && it.value.after(now) } ?: entries.last()
+    // ---------- small icons ----------
 
-        val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(95, 232, 207, 158) }
-        canvas.drawRoundRect(rect, rect.height() * .10f, rect.height() * .10f, bg)
-        val border = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(100, 124, 82, 36); style = Paint.Style.STROKE; strokeWidth = 1.3f }
-        canvas.drawRoundRect(rect, rect.height() * .10f, rect.height() * .10f, border)
-
-        val small = paint(rect.width() * .07f, INK_SOFT, Paint.Align.CENTER)
-        val label = paint(rect.width() * .095f, INK, Paint.Align.CENTER, bold = true)
-        val time = paint(rect.width() * .145f, INK, Paint.Align.CENTER, bold = true)
-        canvas.drawText("הזמן הקרוב", rect.centerX(), rect.top + rect.height() * .25f, small)
-        canvas.drawText(next.label, rect.centerX(), rect.top + rect.height() * .50f, label)
-        canvas.drawText(ZmanimProvider.formatTime(next.value), rect.centerX(), rect.top + rect.height() * .76f, time)
-
-        val mins = next.value?.let { ((it.time - now.time) / 60000L).coerceAtLeast(0) }
-        if (mins != null) {
-            val chip = RectF(rect.left + rect.width() * .19f, rect.bottom - rect.height() * .18f, rect.right - rect.width() * .19f, rect.bottom - rect.height() * .045f)
-            canvas.drawRoundRect(chip, chip.height() / 2f, chip.height() / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 144, 94, 38) })
-            val p = paint(rect.width() * .055f, INK_SOFT, Paint.Align.CENTER, bold = true)
-            canvas.drawText("בעוד $mins דקות", chip.centerX(), chip.centerY() + p.textSize * .35f, p)
+    private fun drawPinIcon(canvas: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color; style = Paint.Style.STROKE
+            strokeWidth = r * 0.32f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
         }
-    }
-
-    private fun entries(day: DayZmanim): List<ZCell> = listOf(
-        ZCell("עלות השחר", day.alosHashachar),
-        ZCell("הנץ החמה", day.netzHachama),
-        ZCell("סוף זמן ק״ש", day.sofZmanShmaGra),
-        ZCell("מנחה גדולה", day.minchaGedola),
-        ZCell("חצות", day.chatzos),
-        ZCell("פלג המנחה", day.plagHamincha),
-        ZCell("שקיעה", day.shkia),
-        ZCell("צאת הכוכבים", day.tzais)
-    )
-
-    private fun drawZmanimStrip(canvas: Canvas, rect: RectF, day: DayZmanim) {
-        val cells = entries(day)
-        val cellW = rect.width() / cells.size
-        val label = paint(cellW * .22f, INK_SOFT, Paint.Align.CENTER)
-        val time = paint(cellW * .28f, INK, Paint.Align.CENTER, bold = true)
-        cells.forEachIndexed { i, c ->
-            val cx = rect.left + cellW * (i + .5f)
-            if (i > 0) canvas.drawLine(rect.left + cellW * i, rect.top + 2f, rect.left + cellW * i, rect.bottom - 2f,
-                Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(65, 111, 72, 34); strokeWidth = 1f })
-            val parts = c.label.split(" ")
-            canvas.drawText(parts.first(), cx, rect.top + rect.height() * .33f, label)
-            if (parts.size > 1) canvas.drawText(parts.drop(1).joinToString(" "), cx, rect.top + rect.height() * .57f, label)
-            canvas.drawText(ZmanimProvider.formatTime(c.value), cx, rect.bottom - rect.height() * .06f, time)
+        val path = Path().apply {
+            moveTo(cx, cy + r * 1.3f)
+            cubicTo(cx - r * 1.3f, cy + r * 0.15f, cx - r * 0.95f, cy - r * 1.3f, cx, cy - r * 1.3f)
+            cubicTo(cx + r * 0.95f, cy - r * 1.3f, cx + r * 1.3f, cy + r * 0.15f, cx, cy + r * 1.3f)
+            close()
         }
+        canvas.drawPath(path, paint)
+        canvas.drawCircle(cx, cy - r * 0.35f, r * 0.4f, paint)
     }
 
-    private fun drawSpecialRow(canvas: Canvas, rect: RectF, day: DayZmanim) {
-        val mid = rect.centerX()
-        val sep = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 111, 72, 34); strokeWidth = 1f }
-        canvas.drawLine(mid, rect.top, mid, rect.bottom, sep)
-
-        val title = paint(rect.width() * .034f, INK, Paint.Align.CENTER, bold = true)
-        val value = paint(rect.width() * .047f, INK, Paint.Align.CENTER, bold = true)
-        val note = paint(rect.width() * .028f, INK_SOFT, Paint.Align.CENTER)
-
-        val leftCx = rect.left + rect.width() * .25f
-        canvas.drawText("🕯  כניסת שבת", leftCx, rect.top + rect.height() * .32f, title)
-        canvas.drawText(ZmanimProvider.formatTime(day.candleLighting), leftCx, rect.top + rect.height() * .73f, value)
-
-        val rightCx = rect.left + rect.width() * .75f
-        val special = day.parshaLabel ?: day.roshChodeshLabel ?: "אין אירוע מיוחד"
-        val specialTitle = if (day.parshaLabel != null) "פרשת השבוע" else "מאורע מיוחד"
-        canvas.drawText(specialTitle, rightCx, rect.top + rect.height() * .32f, title)
-        canvas.drawText(special, rightCx, rect.top + rect.height() * .67f, value)
-        if (day.roshChodeshLabel != null && day.roshChodeshInDays != null && day.parshaLabel != null) {
-            val suffix = if (day.roshChodeshInDays == 0) "היום" else "בעוד ${day.roshChodeshInDays} ימים"
-            canvas.drawText("${day.roshChodeshLabel} · $suffix", rightCx, rect.bottom - 2f, note)
+    private fun drawBookIcon(canvas: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color; style = Paint.Style.STROKE
+            strokeWidth = r * 0.22f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
         }
+        canvas.drawPath(
+            Path().apply {
+                moveTo(cx, cy - r * 0.5f); lineTo(cx - r, cy - r * 0.75f); lineTo(cx - r, cy + r * 0.55f); lineTo(cx, cy + r * 0.35f)
+            },
+            paint
+        )
+        canvas.drawPath(
+            Path().apply {
+                moveTo(cx, cy - r * 0.5f); lineTo(cx + r, cy - r * 0.75f); lineTo(cx + r, cy + r * 0.55f); lineTo(cx, cy + r * 0.35f)
+            },
+            paint
+        )
     }
 
-    private fun drawDivider(canvas: Canvas, x1: Float, x2: Float, y: Float) {
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(90, 111, 72, 34); strokeWidth = 1.2f }
-        canvas.drawLine(x1, y, x2, y, p)
+    private fun drawCandlesIcon(canvas: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
+        drawOneCandle(canvas, cx - r * 0.55f, cy, r, color)
+        drawOneCandle(canvas, cx + r * 0.55f, cy, r, color)
     }
 
-    private fun paint(size: Float, color: Int, align: Paint.Align, bold: Boolean = false): Paint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = color
-            textSize = size
-            textAlign = align
-            typeface = if (bold) Typeface.create(Typeface.SERIF, Typeface.BOLD) else Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+    private fun drawOneCandle(canvas: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
+        canvas.drawRoundRect(RectF(cx - r * 0.16f, cy - r * 0.1f, cx + r * 0.16f, cy + r), r * 0.08f, r * 0.08f, paint)
+        val flame = Path().apply {
+            moveTo(cx, cy - r * 0.8f)
+            quadTo(cx + r * 0.24f, cy - r * 0.32f, cx, cy - r * 0.05f)
+            quadTo(cx - r * 0.24f, cy - r * 0.32f, cx, cy - r * 0.8f)
+            close()
         }
+        canvas.drawPath(flame, paint)
+    }
+
+    // ---------- engraved-text helper ----------
+
+    private fun embossText(canvas: Canvas, text: String, x: Float, y: Float, base: Paint) {
+        val shadow = Paint(base).apply { color = SHADOW; alpha = 160 }
+        val highlight = Paint(base).apply { color = HIGHLIGHT; alpha = 130 }
+        val main = Paint(base).apply { color = GOLD }
+        canvas.drawText(text, x + 1.1f, y + 1.3f, shadow)
+        canvas.drawText(text, x - 0.6f, y - 0.6f, highlight)
+        canvas.drawText(text, x, y, main)
+    }
 }

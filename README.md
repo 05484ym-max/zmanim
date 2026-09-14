@@ -1,83 +1,75 @@
 # זמנים בנעילה — Android live wallpaper
 
-Live wallpaper that redraws a zmanim (halachic day times) glass card once a
-minute, over a vintage Jerusalem-postcard scene that shifts with the time of
-day - dawn/day/dusk/night palettes, a city-wall/dome silhouette, cypress
-trees, an olive branch, film grain, and a real (cheap downscale/upscale)
-backdrop blur behind the card.
+Live wallpaper: an engraved brass/bronze zmanim plaque (analog clock, 8-cell
+zmanim grid, weekly parsha, daily hilula) over either a photo you pick or a
+vintage Jerusalem-postcard scene by default. Redraws every second so the
+clock's second hand actually moves.
 
 ## Project layout
 
 ```
 app/src/main/java/com/zmanim/lockscreen/
-  data/      ZmanimSettings.kt          - SharedPreferences: which location is selected
+  data/      ZmanimSettings.kt          - SharedPreferences: location + optional background photo URI
   zmanim/    ZmanimProvider.kt          - wraps the KosherJava zmanim library
-  wallpaper/ ZmanimWallpaperService.kt  - WallpaperService/Engine + redraw scheduling
-             SkyPalette.kt              - full vintage palette (sky/silhouette/dome/olive/duotone) by time of day
-             VintageScene.kt            - draws the background art
-             GrainTexture.kt            - film-grain overlay tile
-             GlassCard.kt               - blurred glass card + zmanim rows, next zman in gold
-  ui/        SettingsActivity.kt        - city picker, GPS button, "set as wallpaper" button
+  wallpaper/ ZmanimWallpaperService.kt  - WallpaperService/Engine, redraw scheduling, day-data caching
+             GlassCard.kt               - the brass plaque: clock, grid, parsha/hilula lines
+             SkyPalette.kt              - fallback-background palette (sky/silhouette/dome/olive) by time of day
+             VintageScene.kt            - draws the fallback background art
+             GrainTexture.kt            - film-grain overlay tile (fallback background only)
+  ui/        SettingsActivity.kt        - city picker, GPS button, background-photo picker, "set as wallpaper"
 ```
 
 ## Building it
 
-CI compiles the debug APK on every push (`.github/workflows/android-build.yml`)
-— check the [Actions tab](https://github.com/05484ym-max/zmanim/actions) for
-the latest run and download the `zmanim-lockscreen-debug` artifact if you just
-want an installable APK without setting up Android Studio at all.
+CI compiles the debug APK on every push (`.github/workflows/android-build.yml`).
+Two links:
+- **Stable install link** (always the latest `main`, never changes):
+  `https://github.com/05484ym-max/zmanim/releases/download/nightly/app-debug.apk`
+- Per-run build: [Actions tab](https://github.com/05484ym-max/zmanim/actions) → latest run → Artifacts.
 
-To work on the code:
+The repo is private, so downloading either link requires being signed in to
+GitHub as an account with access, in the same browser.
 
-1. Open this folder in Android Studio (Koala or newer). It will offer to
-   generate the Gradle wrapper jar on first sync — accept it (the wrapper
-   *properties* file is committed, but not the binary jar).
-2. Sync Gradle, then Run on a device/emulator running API 26+.
-3. The app itself is just the settings screen. To see the wallpaper: open it,
-   pick a city, tap **הגדר כטפט חי** — that hands off to the system's live
-   wallpaper picker with this wallpaper pre-selected.
+To work on the code: open this folder in Android Studio (Koala+), let it
+generate the Gradle wrapper jar on first sync (the wrapper *properties* file
+is committed, not the binary jar), then run on a device/emulator, API 26+.
 
-## What's real vs. stubbed
+## What's real
 
-- **Zmanim calculation** — real, via `com.kosherjava:zmanim`, and confirmed
-  compiling in CI: `ComplexZmanimCalendar`, `GeoLocation`, `JewishCalendar`
-  and `HebrewDateFormatter` are all being used correctly as of the pinned
-  `2.5.0` version.
-- **Hebrew date** — real, via `HebrewDateFormatter`.
-- **Background time-of-day gradient** — real, driven by today's actual
-  sunrise/sunset.
-- **Redraw scheduling** — real: redraws every 60s, and only while the
-  wallpaper is actually visible (stops when the screen is off / another app
-  is in front), so it isn't burning battery in the background.
-- **Card visuals** — the full mockup layout: title + location, an analog
-  clock (real hour/minute hands from the device clock), a 7-day date strip
-  with today highlighted, a "הזמן הבא" (next zman) box, an 8-cell zmanim grid
-  with the upcoming one highlighted gold and past ones dimmed, and a
-  Shabbat-candle-lighting / Rosh-Chodesh row. All over a real blurred
-  backdrop, warm tint and border. The blur is a manual downscale/upscale
-  trick (`GlassCard.drawBlurredBackdrop`), not `RenderEffect.createBlurEffect`
-  (API 31+ only) — chosen so it works on the full minSdk 26 range.
-- **Candle lighting / Rosh Chodesh** — real: candle lighting is the upcoming
-  Friday's sunset minus 20 minutes (today's, if today is Friday); Rosh
-  Chodesh searches forward day-by-day via `JewishCalendar.isRoshChodesh`
-  (capped at 35 days) and names the month via `HebrewDateFormatter.formatMonth`
-  — both written from memory like the rest of `ZmanimProvider`, so double
-  check them the same way once CI (or Android Studio) compiles this.
-- **GPS location** — real but minimal: reads the last known location, no
-  active location request/geocoded city name.
-- **App/launcher icon** — placeholder vector, not final branding.
+- **Zmanim calculation** — via `com.kosherjava:zmanim`, confirmed compiling
+  in CI. Alos, netz, sof zman shma (GRA), sof zman tefila (GRA), chatzos,
+  mincha gedola, mincha ketana, plag hamincha, shkia, tzais.
+- **Hebrew date, weekly parsha, candle lighting, Rosh Chodesh countdown,
+  curated daily hilulot** — all real, computed in `ZmanimProvider` from
+  `JewishCalendar`/`HebrewDateFormatter`. Candle lighting is the upcoming
+  Friday's sunset minus 20 minutes; Rosh Chodesh scans forward day-by-day
+  (capped at 35 days); the hilula line falls back to the Rosh Chodesh
+  countdown on days with neither.
+- **Background** — a user-picked photo (persisted permission, center-cropped)
+  if one is chosen in settings; otherwise a vintage Jerusalem scene whose
+  palette shifts with sunrise/sunset.
+- **Redraw scheduling** — every second (for the live second hand), but the
+  actual astronomical/Jewish-calendar computation is cached and only redone
+  once a day or on a location change — see `dayFor()` in
+  `ZmanimWallpaperService`. Drawing stops entirely while the wallpaper isn't
+  visible.
+- **GPS location** — reads the last known location; no active location
+  request or reverse-geocoded city name.
 
-## Deliberate deviations from the mockup
+## History note
 
-- The mockup's zmanim strip was 5 icons in one row (it dropped a few times to
-  fit); this keeps all 8 real values as a 4×2 icon grid instead, so nothing
-  computed goes unshown.
-- The "tagline" flourish line under the card isn't included — decorative only,
-  easy to add back later if wanted.
+This repo briefly had two parallel, conflicting implementations after some
+work was done directly on GitHub outside this session (`GlassCard.kt` and
+`TransparentGlassCard.kt`, only one of which was actually wired into the
+wallpaper service) — the current `GlassCard.kt` consolidates that into one
+renderer matching the approved reference design, and the duplicate file is
+gone. If you're driving changes through an AI tool with direct GitHub
+access, pushing straight to `main` from two places at once is how that
+happened — worth avoiding.
 
-## Performance note
+## Not included (by design, to match the approved reference exactly)
 
-`ZmanimWallpaperService.render()` allocates a full-screen ARGB_8888 bitmap
-and does the blur downscale/upscale on the main thread once a minute — fine
-at that cadence, but if this ever needs to redraw more often, move that work
-to a background thread and post the finished bitmap instead.
+- No swipe-to-browse-other-days gesture, no next-zman box, no 7-day date
+  strip, no next-zman gold highlight in the grid — the reference image has
+  none of these, so they were dropped for one-to-one fidelity rather than
+  kept as hidden/undiscoverable features.

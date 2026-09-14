@@ -11,15 +11,21 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.service.wallpaper.WallpaperService
-import android.view.MotionEvent
 import android.view.SurfaceHolder
 import com.zmanim.lockscreen.data.ZmanimSettings
+import com.zmanim.lockscreen.zmanim.DayZmanim
 import com.zmanim.lockscreen.zmanim.ZmanimProvider
+import java.text.SimpleDateFormat
 import java.util.Calendar
-import kotlin.math.abs
+import java.util.Locale
 import kotlin.math.max
 
-/** Live lock-screen wallpaper with a transparent glass zmanim card. */
+/**
+ * Live lock-screen wallpaper: an engraved brass zmanim plaque over the user's chosen photo
+ * (falls back to a vintage Jerusalem scene if none is picked). Redraws every second so the
+ * clock's second hand actually moves - affordable because [dayFor] only recomputes the
+ * astronomical/Jewish-calendar data once a day, not on every frame.
+ */
 class ZmanimWallpaperService : WallpaperService() {
 
     override fun onCreateEngine(): Engine = ZmanimEngine()
@@ -27,12 +33,12 @@ class ZmanimWallpaperService : WallpaperService() {
     private inner class ZmanimEngine : Engine() {
         private val handler = Handler(Looper.getMainLooper())
         private var visible = false
-        private var selectedDayOffset = 0
-        private var touchDownX = 0f
+
         private var cachedBackgroundUri: String? = null
         private var cachedBackground: Bitmap? = null
 
-        init { setTouchEventsEnabled(true) }
+        private var cachedDayKey: String? = null
+        private var cachedDay: DayZmanim? = null
 
         private val drawRunnable = object : Runnable {
             override fun run() {
@@ -55,22 +61,6 @@ class ZmanimWallpaperService : WallpaperService() {
             cachedBackground = null
         }
 
-        override fun onTouchEvent(event: MotionEvent) {
-            super.onTouchEvent(event)
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> touchDownX = event.x
-                MotionEvent.ACTION_UP -> {
-                    val dx = event.x - touchDownX
-                    val threshold = surfaceHolder.surfaceFrame.width() * 0.10f
-                    if (abs(dx) > threshold) {
-                        selectedDayOffset += if (dx < 0) 1 else -1
-                        selectedDayOffset = selectedDayOffset.coerceIn(-365, 365)
-                        draw()
-                    }
-                }
-            }
-        }
-
         private fun draw() {
             val holder = surfaceHolder
             var canvas: Canvas? = null
@@ -88,16 +78,12 @@ class ZmanimWallpaperService : WallpaperService() {
             if (width <= 0 || height <= 0) return
 
             val settings = ZmanimSettings(this@ZmanimWallpaperService)
-            val provider = ZmanimProvider(settings.location)
-            val selectedDate = Calendar.getInstance().apply { add(Calendar.DATE, selectedDayOffset) }
-            val day = provider.forDate(selectedDate)
+            val day = dayFor(settings)
 
-            // Keep the user's chosen photo crisp and untouched. No grain and no full-screen blur.
             val background = getBackground(settings.backgroundUri)
             if (background != null) {
                 drawCenterCrop(canvas, background, width, height)
             } else {
-                // Fallback only when no photo was chosen yet.
                 val palette = SkyPalette.forTime(Calendar.getInstance().time, day.netzHachama, day.shkia)
                 val scene = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 VintageScene.draw(Canvas(scene), width, height, palette)
@@ -105,13 +91,17 @@ class ZmanimWallpaperService : WallpaperService() {
                 scene.recycle()
             }
 
-            TransparentGlassCard.draw(
-                canvas = canvas,
-                width = width,
-                height = height,
-                day = day,
-                locationName = settings.location.name
-            )
+            GlassCard.draw(canvas, width, height, day, settings.location.name)
+        }
+
+        /** Astronomical + Jewish-calendar lookups are only recomputed once a day (or on location change). */
+        private fun dayFor(settings: ZmanimSettings): DayZmanim {
+            val key = DAY_KEY_FORMAT.format(Calendar.getInstance().time) + "|" + settings.location.name
+            cachedDay?.let { if (cachedDayKey == key) return it }
+            val fresh = ZmanimProvider(settings.location).today()
+            cachedDayKey = key
+            cachedDay = fresh
+            return fresh
         }
 
         private fun getBackground(uriString: String?): Bitmap? {
@@ -145,5 +135,6 @@ class ZmanimWallpaperService : WallpaperService() {
 
     companion object {
         private const val REDRAW_INTERVAL_MS = 1_000L
+        private val DAY_KEY_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     }
 }
