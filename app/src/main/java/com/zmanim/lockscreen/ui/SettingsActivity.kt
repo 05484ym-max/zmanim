@@ -28,11 +28,18 @@ class SettingsActivity : AppCompatActivity() {
 
     private val locationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                resolveGpsLocation()
-            } else {
-                Toast.makeText(this, R.string.settings_permission_denied, Toast.LENGTH_SHORT).show()
+            if (granted) resolveGpsLocation()
+            else Toast.makeText(this, R.string.settings_permission_denied, Toast.LENGTH_SHORT).show()
+        }
+
+    private val backgroundPicker =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri ?: return@registerForActivityResult
+            runCatching {
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
+            settings.backgroundUri = uri.toString()
+            Toast.makeText(this, R.string.settings_background_saved, Toast.LENGTH_SHORT).show()
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,12 +62,15 @@ class SettingsActivity : AppCompatActivity() {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 settings.location = PresetLocations.ALL[position]
             }
-
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
 
         findViewById<Button>(R.id.useGpsButton).setOnClickListener {
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
+
+        findViewById<Button>(R.id.chooseBackgroundButton).setOnClickListener {
+            backgroundPicker.launch(arrayOf("image/*"))
         }
 
         findViewById<Button>(R.id.setWallpaperButton).setOnClickListener {
