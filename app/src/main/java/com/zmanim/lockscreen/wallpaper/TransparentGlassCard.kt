@@ -2,10 +2,8 @@ package com.zmanim.lockscreen.wallpaper
 
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
@@ -19,15 +17,14 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Artistic vintage glass card: transparent enough to preserve the wallpaper,
- * with warm ivory typography, muted gold details and RTL-safe Hebrew layout.
+ * Clean vintage-glass zmanim card.
+ * Only the card area is translucent; the wallpaper itself is never darkened or blurred.
  */
 object TransparentGlassCard {
-    private val IVORY = Color.parseColor("#FFF7E8")
-    private val IVORY_SOFT = Color.parseColor("#EEDFC8")
-    private val GOLD = Color.parseColor("#D3AD63")
-    private val GOLD_SOFT = Color.parseColor("#B98D4D")
-    private val RED = Color.parseColor("#A95549")
+    private val IVORY = Color.parseColor("#FFF8EA")
+    private val IVORY_SOFT = Color.parseColor("#F1E4CF")
+    private val GOLD = Color.parseColor("#D5B06A")
+    private val RED = Color.parseColor("#A95A50")
     private val SERIF = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
     private val SERIF_BOLD = Typeface.create(Typeface.SERIF, Typeface.BOLD)
 
@@ -36,130 +33,101 @@ object TransparentGlassCard {
     fun draw(canvas: Canvas, width: Int, height: Int, day: DayZmanim, locationName: String) {
         val w = width.toFloat()
         val h = height.toFloat()
-        val card = RectF(w * 0.08f, h * 0.345f, w * 0.92f, h * 0.755f)
-        val radius = w * 0.05f
 
-        drawGlass(canvas, card, radius, w, h)
-        drawOrnaments(canvas, card, w)
+        // Smaller, lighter card so the wallpaper remains dominant.
+        val card = RectF(w * 0.075f, h * 0.355f, w * 0.925f, h * 0.715f)
+        val radius = w * 0.045f
 
-        val titleBox = RectF(card.left + w * .06f, card.top + h * .018f, card.right - w * .06f, card.top + h * .065f)
-        drawRtl(canvas, "זמני היום", titleBox, w * .054f, IVORY, true)
+        drawGlass(canvas, card, radius, w)
+        drawHeader(canvas, card, w, h, day, locationName)
 
-        val locBox = RectF(card.left + w * .12f, card.top + h * .061f, card.right - w * .12f, card.top + h * .091f)
-        drawRtl(canvas, locationName, locBox, w * .028f, IVORY_SOFT, false)
-
-        val hebBox = RectF(card.left + w * .08f, card.top + h * .094f, card.right - w * .08f, card.top + h * .126f)
-        drawRtl(canvas, day.hebrewDate, hebBox, w * .032f, IVORY, true)
-
-        val civil = textPaint(w * .024f, IVORY_SOFT, false).apply { textAlign = Paint.Align.CENTER }
-        canvas.drawText(day.gregorianDate, card.centerX(), card.top + h * .145f, civil)
-
-        val mainTop = card.top + h * .165f
-        val mainBottom = card.top + h * .295f
-        val clockCx = card.left + card.width() * .26f
-        val clockCy = (mainTop + mainBottom) / 2f
-        val clockR = card.width() * .15f
+        val clockCx = card.left + card.width() * 0.22f
+        val clockCy = card.top + card.height() * 0.43f
+        val clockR = card.width() * 0.125f
         drawClock(canvas, clockCx, clockCy, clockR)
 
-        val nextRect = RectF(card.left + card.width() * .48f, mainTop, card.right - w * .04f, mainBottom)
-        drawNext(canvas, nextRect, day)
+        // No "הזמן הקרוב" box. Use the free space for a clean decorative date area.
+        val dateBox = RectF(
+            card.left + card.width() * 0.42f,
+            card.top + card.height() * 0.25f,
+            card.right - w * 0.035f,
+            card.top + card.height() * 0.50f
+        )
+        drawRtl(canvas, day.hebrewDate, RectF(dateBox.left, dateBox.top, dateBox.right, dateBox.top + dateBox.height() * .45f), w * .031f, IVORY, true)
+        val civil = textPaint(w * .022f, IVORY_SOFT, false).apply { textAlign = Paint.Align.CENTER }
+        canvas.drawText(day.gregorianDate, dateBox.centerX(), dateBox.top + dateBox.height() * .72f, civil)
 
         val divider = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(90, 225, 196, 145)
+            color = Color.argb(90, 221, 191, 135)
             strokeWidth = 1.2f
         }
-        val divY = card.top + h * .315f
-        canvas.drawLine(card.left + w * .045f, divY, card.right - w * .045f, divY, divider)
+        val divY = card.top + card.height() * 0.56f
+        canvas.drawLine(card.left + w * .04f, divY, card.right - w * .04f, divY, divider)
 
-        val grid = RectF(card.left + w * .035f, divY + h * .012f, card.right - w * .035f, card.top + h * .382f)
+        // Large 4x2 grid with readable labels and times.
+        val grid = RectF(
+            card.left + w * .025f,
+            divY + h * .006f,
+            card.right - w * .025f,
+            card.bottom - h * .044f
+        )
         drawZmanimGrid(canvas, grid, day)
 
-        val bottomDividerY = card.bottom - h * .054f
-        canvas.drawLine(card.left + w * .045f, bottomDividerY, card.right - w * .045f, bottomDividerY, divider)
-        drawSpecialRow(canvas, RectF(card.left + w * .045f, bottomDividerY + h * .006f, card.right - w * .045f, card.bottom - h * .01f), day)
+        val specialTop = card.bottom - h * .038f
+        canvas.drawLine(card.left + w * .04f, specialTop, card.right - w * .04f, specialTop, divider)
+        drawSpecialRow(
+            canvas,
+            RectF(card.left + w * .04f, specialTop + h * .004f, card.right - w * .04f, card.bottom - h * .005f),
+            day
+        )
     }
 
-    private fun drawGlass(canvas: Canvas, card: RectF, radius: Float, w: Float, h: Float) {
-        val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(28, 0, 0, 0)
-            setShadowLayer(w * .022f, 0f, h * .004f, Color.argb(90, 0, 0, 0))
+    private fun drawGlass(canvas: Canvas, card: RectF, radius: Float, w: Float) {
+        // Very light fill only inside the card. No heavy shadow, no full-screen effect.
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(34, 34, 30, 26)
         }
-        canvas.drawRoundRect(RectF(card.left, card.top + h * .004f, card.right, card.bottom + h * .004f), radius, radius, shadow)
-        shadow.clearShadowLayer()
+        canvas.drawRoundRect(card, radius, radius, fill)
 
-        val glass = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                card.left, card.top, card.right, card.bottom,
-                intArrayOf(Color.argb(72, 42, 38, 32), Color.argb(50, 26, 24, 22), Color.argb(62, 54, 47, 38)),
-                floatArrayOf(0f, .55f, 1f),
-                Shader.TileMode.CLAMP
-            )
+        val softInner = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(18, 255, 248, 233)
         }
-        canvas.drawRoundRect(card, radius, radius, glass)
+        canvas.drawRoundRect(
+            RectF(card.left + 4f, card.top + 4f, card.right - 4f, card.bottom - 4f),
+            radius * .9f,
+            radius * .9f,
+            softInner
+        )
 
-        val highlight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(28, 255, 246, 224)
-            style = Paint.Style.STROKE
-            strokeWidth = w * .005f
-        }
-        canvas.drawRoundRect(RectF(card.left + 2f, card.top + 2f, card.right - 2f, card.bottom - 2f), radius * .94f, radius * .94f, highlight)
-
-        val goldBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(150, 211, 173, 99)
+        val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(150, 213, 176, 106)
             style = Paint.Style.STROKE
             strokeWidth = w * .0018f
         }
-        canvas.drawRoundRect(RectF(card.left + w * .008f, card.top + w * .008f, card.right - w * .008f, card.bottom - w * .008f), radius * .82f, radius * .82f, goldBorder)
+        canvas.drawRoundRect(card, radius, radius, border)
     }
 
-    private fun drawOrnaments(canvas: Canvas, card: RectF, w: Float) {
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(170, 211, 173, 99)
-            strokeWidth = w * .0018f
+    private fun drawHeader(canvas: Canvas, card: RectF, w: Float, h: Float, day: DayZmanim, locationName: String) {
+        val title = textPaint(w * .052f, IVORY, true).apply { textAlign = Paint.Align.CENTER }
+        canvas.drawText("זמני היום", card.centerX(), card.top + h * .035f, title)
+
+        val ornament = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(150, 213, 176, 106)
+            strokeWidth = 1.4f
         }
-        val y = card.top + card.height() * .12f
-        val cx = card.centerX()
-        val gap = card.width() * .11f
-        val len = card.width() * .21f
-        canvas.drawLine(cx - gap - len, y, cx - gap, y, p)
-        canvas.drawLine(cx + gap, y, cx + gap + len, y, p)
-        drawDiamond(canvas, cx - gap * .78f, y, w * .006f, p)
-        drawDiamond(canvas, cx + gap * .78f, y, w * .006f, p)
-    }
+        val oy = card.top + h * .043f
+        val gap = w * .11f
+        canvas.drawLine(card.centerX() - w * .25f, oy, card.centerX() - gap, oy, ornament)
+        canvas.drawLine(card.centerX() + gap, oy, card.centerX() + w * .25f, oy, ornament)
 
-    private fun drawDiamond(canvas: Canvas, cx: Float, cy: Float, r: Float, p: Paint) {
-        val path = android.graphics.Path().apply {
-            moveTo(cx, cy - r)
-            lineTo(cx + r, cy)
-            lineTo(cx, cy + r)
-            lineTo(cx - r, cy)
-            close()
-        }
-        canvas.drawPath(path, p)
-    }
-
-    private fun drawNext(canvas: Canvas, rect: RectF, day: DayZmanim) {
-        val next = nextUpcoming(day)
-        val now = Date()
-        val panel = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(24, 238, 211, 164) }
-        canvas.drawRoundRect(rect, rect.height() * .16f, rect.height() * .16f, panel)
-        val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(80, 211, 173, 99)
-            style = Paint.Style.STROKE
-            strokeWidth = 1f
-        }
-        canvas.drawRoundRect(rect, rect.height() * .16f, rect.height() * .16f, stroke)
-
-        drawRtl(canvas, "הזמן הקרוב", RectF(rect.left, rect.top + rect.height() * .08f, rect.right, rect.top + rect.height() * .30f), rect.width() * .075f, IVORY_SOFT, false)
-        drawRtl(canvas, next.first, RectF(rect.left + 4f, rect.top + rect.height() * .31f, rect.right - 4f, rect.top + rect.height() * .56f), rect.width() * .095f, IVORY, true)
-
-        val time = textPaint(rect.width() * .14f, GOLD, true).apply { textAlign = Paint.Align.CENTER }
-        canvas.drawText(ZmanimProvider.formatTime(next.second), rect.centerX(), rect.top + rect.height() * .76f, time)
-
-        val mins = next.second?.let { ((it.time - now.time) / 60000L).coerceAtLeast(0) }
-        if (mins != null) {
-            drawRtl(canvas, "בעוד $mins דקות", RectF(rect.left, rect.bottom - rect.height() * .18f, rect.right, rect.bottom - rect.height() * .02f), rect.width() * .064f, IVORY_SOFT, false)
-        }
+        drawRtl(
+            canvas,
+            locationName,
+            RectF(card.left + w * .12f, card.top + h * .048f, card.right - w * .12f, card.top + h * .075f),
+            w * .027f,
+            IVORY_SOFT,
+            false
+        )
     }
 
     private fun drawZmanimGrid(canvas: Canvas, rect: RectF, day: DayZmanim) {
@@ -168,39 +136,66 @@ object TransparentGlassCard {
         val rows = 2
         val cellW = rect.width() / cols
         val cellH = rect.height() / rows
-        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(42, 238, 223, 200); strokeWidth = 1f }
 
+        val gridLine = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(42, 235, 220, 195)
+            strokeWidth = 1f
+        }
         for (c in 1 until cols) {
             val x = rect.left + cellW * c
-            canvas.drawLine(x, rect.top + 4f, x, rect.bottom - 4f, line)
+            canvas.drawLine(x, rect.top + 2f, x, rect.bottom - 2f, gridLine)
         }
-        canvas.drawLine(rect.left + 4f, rect.top + cellH, rect.right - 4f, rect.top + cellH, line)
+        canvas.drawLine(rect.left + 2f, rect.top + cellH, rect.right - 2f, rect.top + cellH, gridLine)
 
         cells.forEachIndexed { index, cell ->
             val col = index % cols
             val row = index / cols
-            val box = RectF(rect.left + col * cellW, rect.top + row * cellH, rect.left + (col + 1) * cellW, rect.top + (row + 1) * cellH)
-            drawRtl(canvas, cell.label, RectF(box.left + 4f, box.top + box.height() * .08f, box.right - 4f, box.top + box.height() * .50f), cellW * .12f, IVORY_SOFT, false)
-            val time = textPaint(cellW * .15f, IVORY, true).apply { textAlign = Paint.Align.CENTER }
-            canvas.drawText(ZmanimProvider.formatTime(cell.value), box.centerX(), box.bottom - box.height() * .12f, time)
+            val box = RectF(
+                rect.left + col * cellW,
+                rect.top + row * cellH,
+                rect.left + (col + 1) * cellW,
+                rect.top + (row + 1) * cellH
+            )
+
+            // One compact RTL-safe label, then a clearly separated time.
+            drawRtl(
+                canvas,
+                cell.label,
+                RectF(box.left + 6f, box.top + box.height() * .10f, box.right - 6f, box.top + box.height() * .48f),
+                cellW * .115f,
+                IVORY_SOFT,
+                false
+            )
+
+            val time = textPaint(cellW * .155f, IVORY, true).apply { textAlign = Paint.Align.CENTER }
+            canvas.drawText(
+                ZmanimProvider.formatTime(cell.value),
+                box.centerX(),
+                box.bottom - box.height() * .14f,
+                time
+            )
         }
     }
 
     private fun drawSpecialRow(canvas: Canvas, rect: RectF, day: DayZmanim) {
-        val mid = rect.centerX()
-        val sep = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(50, 238, 223, 200); strokeWidth = 1f }
-        canvas.drawLine(mid, rect.top + 3f, mid, rect.bottom - 3f, sep)
+        val left = RectF(rect.left, rect.top, rect.centerX() - 4f, rect.bottom)
+        val right = RectF(rect.centerX() + 4f, rect.top, rect.right, rect.bottom)
 
-        val left = RectF(rect.left, rect.top, mid - 4f, rect.bottom)
-        val right = RectF(mid + 4f, rect.top, rect.right, rect.bottom)
-        drawRtl(canvas, "כניסת שבת\n${ZmanimProvider.formatTime(day.candleLighting)}", left, rect.width() * .035f, IVORY, true)
+        drawRtl(
+            canvas,
+            "כניסת שבת  ${ZmanimProvider.formatTime(day.candleLighting)}",
+            left,
+            rect.width() * .032f,
+            IVORY,
+            true
+        )
 
         val special = when {
             !day.roshChodeshLabel.isNullOrBlank() -> day.roshChodeshLabel
             !day.parshaLabel.isNullOrBlank() -> "פרשת ${day.parshaLabel}"
             else -> "שבת שלום"
         }
-        drawRtl(canvas, special ?: "", right, rect.width() * .033f, GOLD, true)
+        drawRtl(canvas, special ?: "", right, rect.width() * .032f, GOLD, true)
     }
 
     private fun entries(day: DayZmanim): List<ZCell> = listOf(
@@ -214,81 +209,103 @@ object TransparentGlassCard {
         ZCell("צאת הכוכבים", day.tzais)
     )
 
-    private fun nextUpcoming(day: DayZmanim): Pair<String, Date?> {
-        val now = Date()
-        return entries(day).firstOrNull { it.value?.after(now) == true }?.let { it.label to it.value }
-            ?: ("מחר" to null)
-    }
-
     private fun drawClock(canvas: Canvas, cx: Float, cy: Float, r: Float) {
-        val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(24, 255, 244, 218) }
-        canvas.drawCircle(cx, cy, r * 1.05f, glow)
-
-        val face = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(26, 255, 249, 237) }
+        val face = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(20, 255, 249, 237) }
         canvas.drawCircle(cx, cy, r, face)
+
         val outer = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(180, 211, 173, 99)
+            color = Color.argb(180, 213, 176, 106)
             style = Paint.Style.STROKE
             strokeWidth = r * .028f
         }
         canvas.drawCircle(cx, cy, r, outer)
-        val inner = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(90, 255, 245, 220)
-            style = Paint.Style.STROKE
-            strokeWidth = r * .012f
-        }
-        canvas.drawCircle(cx, cy, r * .89f, inner)
 
-        val tick = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(150, 255, 244, 218); strokeWidth = r * .01f }
+        val ticks = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(145, 255, 244, 218)
+            strokeWidth = r * .01f
+        }
         for (i in 0 until 60) {
             val a = Math.toRadians((i * 6 - 90).toDouble())
-            val o = r * .82f
-            val inn = if (i % 5 == 0) r * .73f else r * .78f
-            canvas.drawLine(cx + inn * cos(a).toFloat(), cy + inn * sin(a).toFloat(), cx + o * cos(a).toFloat(), cy + o * sin(a).toFloat(), tick)
+            val outerR = r * .82f
+            val innerR = if (i % 5 == 0) r * .72f else r * .77f
+            canvas.drawLine(
+                cx + innerR * cos(a).toFloat(),
+                cy + innerR * sin(a).toFloat(),
+                cx + outerR * cos(a).toFloat(),
+                cy + outerR * sin(a).toFloat(),
+                ticks
+            )
         }
 
-        val num = textPaint(r * .20f, IVORY, false).apply { textAlign = Paint.Align.CENTER }
+        val number = textPaint(r * .20f, IVORY, false).apply { textAlign = Paint.Align.CENTER }
         for (n in 1..12) {
             val a = Math.toRadians((n * 30 - 90).toDouble())
-            canvas.drawText(n.toString(), cx + r * .61f * cos(a).toFloat(), cy + r * .61f * sin(a).toFloat() + num.textSize * .33f, num)
+            canvas.drawText(
+                n.toString(),
+                cx + r * .60f * cos(a).toFloat(),
+                cy + r * .60f * sin(a).toFloat() + number.textSize * .33f,
+                number
+            )
         }
 
-        val cal = Calendar.getInstance()
-        val sec = cal.get(Calendar.SECOND)
-        val min = cal.get(Calendar.MINUTE) + sec / 60f
-        val hour = cal.get(Calendar.HOUR) + min / 60f
-        hand(canvas, cx, cy, r * .48f, hour * 30f, r * .055f, IVORY)
-        hand(canvas, cx, cy, r * .68f, min * 6f, r * .035f, IVORY_SOFT)
+        val now = Calendar.getInstance()
+        val sec = now.get(Calendar.SECOND)
+        val min = now.get(Calendar.MINUTE) + sec / 60f
+        val hour = now.get(Calendar.HOUR) + min / 60f
+        hand(canvas, cx, cy, r * .47f, hour * 30f, r * .055f, IVORY)
+        hand(canvas, cx, cy, r * .67f, min * 6f, r * .035f, IVORY_SOFT)
         hand(canvas, cx, cy, r * .76f, sec * 6f, r * .012f, RED)
-        canvas.drawCircle(cx, cy, r * .055f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = GOLD })
+        canvas.drawCircle(cx, cy, r * .045f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = GOLD })
     }
 
-    private fun hand(canvas: Canvas, cx: Float, cy: Float, length: Float, angle: Float, width: Float, color: Int) {
-        val a = Math.toRadians((angle - 90f).toDouble())
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color; strokeWidth = width; strokeCap = Paint.Cap.ROUND }
-        canvas.drawLine(cx, cy, cx + length * cos(a).toFloat(), cy + length * sin(a).toFloat(), p)
+    private fun hand(canvas: Canvas, cx: Float, cy: Float, length: Float, deg: Float, stroke: Float, color: Int) {
+        val a = Math.toRadians((deg - 90f).toDouble())
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            strokeWidth = stroke
+            strokeCap = Paint.Cap.ROUND
+        }
+        canvas.drawLine(
+            cx,
+            cy,
+            cx + length * cos(a).toFloat(),
+            cy + length * sin(a).toFloat(),
+            p
+        )
+    }
+
+    private fun drawRtl(
+        canvas: Canvas,
+        text: String,
+        box: RectF,
+        size: Float,
+        color: Int,
+        bold: Boolean
+    ) {
+        val p = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = size
+            this.color = color
+            typeface = if (bold) SERIF_BOLD else SERIF
+        }
+        val width = box.width().toInt().coerceAtLeast(1)
+        val layout = StaticLayout.Builder.obtain(text, 0, text.length, p, width)
+            .setAlignment(Layout.Alignment.ALIGN_CENTER)
+            .setTextDirection(TextDirectionHeuristics.RTL)
+            .setIncludePad(false)
+            .setMaxLines(2)
+            .setLineSpacing(0f, 0.92f)
+            .build()
+
+        canvas.save()
+        val y = box.top + (box.height() - layout.height) / 2f
+        canvas.translate(box.left, y)
+        layout.draw(canvas)
+        canvas.restore()
     }
 
     private fun textPaint(size: Float, color: Int, bold: Boolean): TextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = size
         this.color = color
         typeface = if (bold) SERIF_BOLD else SERIF
-        setShadowLayer(2.5f, 0f, 1f, Color.argb(120, 0, 0, 0))
-    }
-
-    private fun drawRtl(canvas: Canvas, text: String, box: RectF, size: Float, color: Int, bold: Boolean) {
-        if (text.isBlank() || box.width() <= 0f || box.height() <= 0f) return
-        val paint = textPaint(size, color, bold)
-        val layout = StaticLayout.Builder.obtain(text, 0, text.length, paint, box.width().toInt().coerceAtLeast(1))
-            .setAlignment(Layout.Alignment.ALIGN_CENTER)
-            .setTextDirection(TextDirectionHeuristics.RTL)
-            .setIncludePad(false)
-            .setLineSpacing(0f, 0.92f)
-            .build()
-        val y = box.top + ((box.height() - layout.height) / 2f).coerceAtLeast(0f)
-        canvas.save()
-        canvas.translate(box.left, y)
-        layout.draw(canvas)
-        canvas.restore()
     }
 }
