@@ -17,7 +17,14 @@ app/src/main/java/com/zmanim/lockscreen/
   ui/        SettingsActivity.kt    - city picker, GPS button, "set as wallpaper" button
 ```
 
-## Opening it
+## Building it
+
+CI compiles the debug APK on every push (`.github/workflows/android-build.yml`)
+— check the [Actions tab](https://github.com/05484ym-max/zmanim/actions) for
+the latest run and download the `zmanim-lockscreen-debug` artifact if you just
+want an installable APK without setting up Android Studio at all.
+
+To work on the code:
 
 1. Open this folder in Android Studio (Koala or newer). It will offer to
    generate the Gradle wrapper jar on first sync — accept it (the wrapper
@@ -29,12 +36,10 @@ app/src/main/java/com/zmanim/lockscreen/
 
 ## What's real vs. stubbed
 
-- **Zmanim calculation** — real, via `com.kosherjava:zmanim`. The method
-  names in `ZmanimProvider` were written from memory, not compiled here (no
-  Android SDK in this environment) — double-check them against the pinned
-  library version's javadoc on first build; if `ComplexZmanimCalendar`,
-  `GeoLocation`, `JewishCalendar` or `HebrewDateFormatter` have moved/renamed
-  a method, the fix is local to that one file.
+- **Zmanim calculation** — real, via `com.kosherjava:zmanim`, and confirmed
+  compiling in CI: `ComplexZmanimCalendar`, `GeoLocation`, `JewishCalendar`
+  and `HebrewDateFormatter` are all being used correctly as of the pinned
+  `2.5.0` version.
 - **Hebrew date** — real, via `HebrewDateFormatter`.
 - **Background time-of-day gradient** — real, driven by today's actual
   sunrise/sunset.
