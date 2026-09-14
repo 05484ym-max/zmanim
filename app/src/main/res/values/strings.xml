@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">זמנים בנעילה</string>
+    <string name="wallpaper_description">זמני היום ההלכתיים כטפט חי על מסך הנעילה</string>
+
+    <string name="settings_title">זמני היום</string>
+    <string name="settings_subtitle">בחרו מיקום ואז הגדירו את הטפט החי</string>
+    <string name="settings_use_gps">אתר אותי אוטומטית</string>
+    <string name="settings_set_wallpaper">הגדר כטפט חי</string>
+    <string name="settings_location_updated">המיקום עודכן</string>
+    <string name="settings_location_unavailable">לא נמצא מיקום אחרון, נסו שוב בעוד רגע</string>
+    <string name="settings_permission_denied">אין הרשאת מיקום</string>
+    <string name="settings_gps_label">המיקום שלי</string>
+
+    <string name="zman_alos">עלות השחר</string>
+    <string name="zman_netz">הנץ החמה</string>
+    <string name="zman_sof_zman_shma">סוף זמן קריאת שמע (גר״א)</string>
+    <string name="zman_chatzos">חצות היום</string>
+    <string name="zman_mincha_gedola">מנחה גדולה</string>
+    <string name="zman_plag">פלג המנחה</string>
+    <string name="zman_shkia">שקיעה</string>
+    <string name="zman_tzais">צאת הכוכבים</string>
+</resources>
