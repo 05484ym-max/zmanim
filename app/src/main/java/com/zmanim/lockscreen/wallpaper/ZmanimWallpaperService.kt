@@ -12,6 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
+import com.zmanim.lockscreen.R
 import com.zmanim.lockscreen.data.ZmanimSettings
 import com.zmanim.lockscreen.zmanim.DayZmanim
 import com.zmanim.lockscreen.zmanim.ZmanimProvider
@@ -39,6 +40,11 @@ class ZmanimWallpaperService : WallpaperService() {
 
         private var cachedDayKey: String? = null
         private var cachedDay: DayZmanim? = null
+
+        /** The approved reference plaque - decoded once, not on every second's redraw. */
+        private val plaqueBitmap: Bitmap? by lazy {
+            runCatching { BitmapFactory.decodeResource(resources, R.drawable.plaque_bronze) }.getOrNull()
+        }
 
         private val drawRunnable = object : Runnable {
             override fun run() {
@@ -91,7 +97,7 @@ class ZmanimWallpaperService : WallpaperService() {
                 scene.recycle()
             }
 
-            GlassCard.draw(canvas, width, height, day, settings.location.name)
+            GlassCard.draw(canvas, plaqueBitmap, width, height, day, settings.location.name)
         }
 
         /** Astronomical + Jewish-calendar lookups are only recomputed once a day (or on location change). */

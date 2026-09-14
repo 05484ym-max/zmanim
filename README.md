@@ -1,9 +1,20 @@
 # זמנים בנעילה — Android live wallpaper
 
-Live wallpaper: an engraved brass/bronze zmanim plaque (analog clock, 8-cell
-zmanim grid, weekly parsha, daily hilula) over either a photo you pick or a
-vintage Jerusalem-postcard scene by default. Redraws every second so the
-clock's second hand actually moves.
+Live wallpaper: the approved bronze-plaque reference image
+(`app/src/main/res/drawable-nodpi/plaque_bronze.jpg`) as the card itself -
+bezel, corner filigree, hammered texture and static labels are that exact
+image, pixel for pixel - with only the parts that actually change (clock
+hands, dates, location, the 8 zmanim values, parsha/hilula) drawn on top
+each redraw, patched over the image's own frozen placeholder values first.
+Sits over either a photo you pick or a vintage Jerusalem-postcard scene by
+default. Redraws every second so the clock's second hand actually moves.
+
+**Not yet visually verified on-device** - the patch/overlay coordinates in
+`GlassCard.kt` were measured directly off the reference image's pixels
+(see conversation), not guessed, but this was never rendered on a real
+screen to confirm alignment. If something sits slightly off (a value not
+centered in its cell, a line patch too narrow/wide), the fix is a single
+`*Frac` constant in `GlassCard.kt`, not a redesign.
 
 ## Project layout
 
@@ -12,7 +23,7 @@ app/src/main/java/com/zmanim/lockscreen/
   data/      ZmanimSettings.kt          - SharedPreferences: location + optional background photo URI
   zmanim/    ZmanimProvider.kt          - wraps the KosherJava zmanim library
   wallpaper/ ZmanimWallpaperService.kt  - WallpaperService/Engine, redraw scheduling, day-data caching
-             GlassCard.kt               - the brass plaque: clock, grid, parsha/hilula lines
+             GlassCard.kt               - draws plaque_bronze.jpg + patches the dynamic values on top
              SkyPalette.kt              - fallback-background palette (sky/silhouette/dome/olive) by time of day
              VintageScene.kt            - draws the fallback background art
              GrainTexture.kt            - film-grain overlay tile (fallback background only)
