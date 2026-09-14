@@ -51,7 +51,7 @@ object GlassCard {
         val aspect = if (plaque != null) plaque.height.toFloat() / plaque.width.toFloat() else 1f / FALLBACK_ASPECT
         val cardH = (cardW * aspect).coerceAtMost(h * 0.74f)
         val left = (w - cardW) / 2f
-        val top = h * 0.13f
+        val top = h * 0.15f
         val rect = RectF(left, top, left + cardW, top + cardH)
 
         if (plaque != null) {
@@ -88,8 +88,8 @@ object GlassCard {
     private fun drawClock(canvas: Canvas, rect: RectF, day: DayZmanim) {
         val w = rect.width()
         val h = rect.height()
-        val cx = rect.left + w * 0.28f
-        val cy = rect.top + h * 0.16f
+        val cx = rect.left + w * 0.275f
+        val cy = rect.top + h * 0.205f
         val faceR = w * 0.205f
 
         canvas.drawCircle(cx, cy, faceR * 0.86f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = PATCH_CLOCK_FACE })
@@ -141,15 +141,15 @@ object GlassCard {
         val h = rect.height()
         val textCx = rect.left + w * 0.725f
 
-        patchRect(canvas, rect, 0.50f, 0.97f, 0.145f, 0.055f, PATCH_TITLE_BLOCK)
-        drawPinIcon(canvas, textCx - w * 0.11f, rect.top + h * 0.148f, w * 0.016f, GOLD)
-        embossText(canvas, locationName, textCx + w * 0.02f, rect.top + h * 0.158f, w * 0.038f, bold = false)
+        patchRect(canvas, rect, 0.50f, 0.97f, 0.18f, 0.05f, PATCH_TITLE_BLOCK)
+        drawPinIcon(canvas, textCx - w * 0.11f, rect.top + h * 0.183f, w * 0.016f, GOLD)
+        embossText(canvas, locationName, textCx + w * 0.02f, rect.top + h * 0.193f, w * 0.038f, bold = false)
 
-        patchRect(canvas, rect, 0.50f, 0.97f, 0.19f, 0.06f, PATCH_TITLE_BLOCK)
-        embossText(canvas, day.hebrewDate, textCx, rect.top + h * 0.205f, w * 0.046f, bold = true)
+        patchRect(canvas, rect, 0.50f, 0.97f, 0.27f, 0.055f, PATCH_TITLE_BLOCK)
+        embossText(canvas, day.hebrewDate, textCx, rect.top + h * 0.28f, w * 0.046f, bold = true)
 
-        patchRect(canvas, rect, 0.50f, 0.97f, 0.235f, 0.05f, PATCH_TITLE_BLOCK)
-        embossText(canvas, day.gregorianDate, textCx, rect.top + h * 0.245f, w * 0.030f, bold = false)
+        patchRect(canvas, rect, 0.50f, 0.97f, 0.325f, 0.045f, PATCH_TITLE_BLOCK)
+        embossText(canvas, day.gregorianDate, textCx, rect.top + h * 0.333f, w * 0.030f, bold = false)
     }
 
     // ---------- zmanim grid: numbers only, labels are baked into the image ----------
@@ -168,13 +168,13 @@ object GlassCard {
             Cell(day.minchaKetana, xFracs[2]),
             Cell(day.minchaGedola, xFracs[3])
         )
-        drawRow(canvas, rect, topRow, yFrac = 0.42f)
-        drawRow(canvas, rect, bottomRow, yFrac = 0.575f)
+        drawRow(canvas, rect, topRow, yFrac = 0.50f)
+        drawRow(canvas, rect, bottomRow, yFrac = 0.70f)
     }
 
     private fun drawRow(canvas: Canvas, rect: RectF, cells: List<Cell>, yFrac: Float) {
         cells.forEach { cell ->
-            patchRect(canvas, rect, cell.xFrac - 0.10f, cell.xFrac + 0.10f, yFrac, 0.055f, PATCH_GRID)
+            patchRect(canvas, rect, cell.xFrac - 0.10f, cell.xFrac + 0.10f, yFrac, 0.05f, PATCH_GRID)
             embossText(
                 canvas, ZmanimProvider.formatTime(cell.time),
                 rect.left + rect.width() * cell.xFrac, rect.top + rect.height() * (yFrac + 0.014f),
@@ -188,11 +188,11 @@ object GlassCard {
     private fun drawParshaLine(canvas: Canvas, rect: RectF, day: DayZmanim) {
         val w = rect.width()
         val h = rect.height()
-        patchRect(canvas, rect, 0.08f, 0.92f, 0.695f, 0.06f, PATCH_PARSHA)
+        patchRect(canvas, rect, 0.08f, 0.92f, 0.82f, 0.055f, PATCH_PARSHA)
         val text = day.parshaLabel?.let { "פרשת השבוע: $it" } ?: "פרשת השבוע"
         val size = w * 0.037f
-        drawBookIcon(canvas, rect.centerX() - textHalfWidth(text, size) - w * 0.05f, rect.top + h * 0.685f, w * 0.022f, GOLD)
-        embossText(canvas, text, rect.centerX(), rect.top + h * 0.70f, size, bold = false)
+        drawBookIcon(canvas, rect.centerX() - textHalfWidth(text, size) - w * 0.05f, rect.top + h * 0.81f, w * 0.022f, GOLD)
+        embossText(canvas, text, rect.centerX(), rect.top + h * 0.825f, size, bold = false)
     }
 
     private fun drawHilulaLine(canvas: Canvas, rect: RectF, day: DayZmanim) {
@@ -207,10 +207,10 @@ object GlassCard {
 
         val w = rect.width()
         val h = rect.height()
-        patchRect(canvas, rect, 0.08f, 0.92f, 0.83f, 0.06f, PATCH_HILULA)
+        patchRect(canvas, rect, 0.08f, 0.92f, 0.91f, 0.055f, PATCH_HILULA)
         val size = w * 0.034f
-        drawCandlesIcon(canvas, rect.centerX() - textHalfWidth(text, size) - w * 0.055f, rect.top + h * 0.82f, w * 0.02f, GOLD)
-        embossText(canvas, text, rect.centerX(), rect.top + h * 0.835f, size, bold = false)
+        drawCandlesIcon(canvas, rect.centerX() - textHalfWidth(text, size) - w * 0.055f, rect.top + h * 0.90f, w * 0.02f, GOLD)
+        embossText(canvas, text, rect.centerX(), rect.top + h * 0.915f, size, bold = false)
     }
 
     private fun textHalfWidth(text: String, size: Float): Float {
