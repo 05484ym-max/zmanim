@@ -92,13 +92,23 @@ class ZmanimProvider(private val location: LocationConfig) {
         return Date(fridaySunset.time - CANDLE_LIGHTING_OFFSET_MS)
     }
 
+    /**
+     * Returns the next actual weekly parasha in Israel.
+     * If the nearest Shabbat is a festival and KosherJava returns no parasha,
+     * continue to following Shabbatot until a regular weekly portion is found.
+     */
     private fun findUpcomingParsha(today: Calendar, formatter: HebrewDateFormatter): String? {
         val shabbat = today.clone() as Calendar
         while (shabbat.get(Calendar.DAY_OF_WEEK) != Calendar.SATURDAY) {
             shabbat.add(Calendar.DATE, 1)
         }
-        val jc = JewishCalendar(shabbat).apply { inIsrael = true }
-        return runCatching { formatter.formatParsha(jc).takeIf { it.isNotBlank() } }.getOrNull()
+        repeat(8) {
+            val jc = JewishCalendar(shabbat).apply { inIsrael = true }
+            val label = runCatching { formatter.formatParsha(jc).trim() }.getOrNull()
+            if (!label.isNullOrBlank()) return label
+            shabbat.add(Calendar.DATE, 7)
+        }
+        return null
     }
 
     private fun findHilula(jc: JewishCalendar): String? {
@@ -140,11 +150,6 @@ class ZmanimProvider(private val location: LocationConfig) {
         private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
         private const val CANDLE_LIGHTING_OFFSET_MS = 20 * 60 * 1000L
 
-        /**
-         * Curated common hilulot. The structure supports multiple names on the same Hebrew date
-         * and can be expanded without touching the rendering code.
-         * Jewish month numbering follows KosherJava: Nisan=1 ... Elul=6, Tishrei=7 ... Adar=12/13.
-         */
         private val HILULOT: Map<Pair<Int, Int>, List<String>> = mapOf(
             (7 to 18) to listOf("רבי נחמן מברסלב"),
             (7 to 25) to listOf("רבי לוי יצחק מברדיטשוב"),
