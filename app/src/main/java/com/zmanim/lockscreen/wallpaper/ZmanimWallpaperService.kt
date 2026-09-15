@@ -3,7 +3,6 @@ package com.zmanim.lockscreen.wallpaper
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
@@ -12,7 +11,6 @@ import android.os.Handler
 import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
-import com.zmanim.lockscreen.R
 import com.zmanim.lockscreen.data.ZmanimSettings
 import com.zmanim.lockscreen.zmanim.DayZmanim
 import com.zmanim.lockscreen.zmanim.ZmanimProvider
@@ -22,10 +20,8 @@ import java.util.Locale
 import kotlin.math.max
 
 /**
- * Live lock-screen wallpaper: an engraved brass zmanim plaque over the user's chosen photo
- * (falls back to a vintage Jerusalem scene if none is picked). Redraws every second so the
- * clock's second hand actually moves - affordable because [dayFor] only recomputes the
- * astronomical/Jewish-calendar data once a day, not on every frame.
+ * Live lock-screen wallpaper: a transparent zmanim glass layer over the user's chosen photo.
+ * The renderer never darkens, blurs, tints or paints over the area outside the card.
  */
 class ZmanimWallpaperService : WallpaperService() {
 
@@ -40,11 +36,6 @@ class ZmanimWallpaperService : WallpaperService() {
 
         private var cachedDayKey: String? = null
         private var cachedDay: DayZmanim? = null
-
-        /** The approved reference plaque - decoded once, not on every second's redraw. */
-        private val plaqueBitmap: Bitmap? by lazy {
-            runCatching { BitmapFactory.decodeResource(resources, R.drawable.plaque_bronze) }.getOrNull()
-        }
 
         private val drawRunnable = object : Runnable {
             override fun run() {
@@ -88,8 +79,10 @@ class ZmanimWallpaperService : WallpaperService() {
 
             val background = getBackground(settings.backgroundUri)
             if (background != null) {
+                // Draw the selected image directly, with no dimming/color overlay.
                 drawCenterCrop(canvas, background, width, height)
             } else {
+                // Only used when the user has not selected a background image yet.
                 val palette = SkyPalette.forTime(Calendar.getInstance().time, day.netzHachama, day.shkia)
                 val scene = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 VintageScene.draw(Canvas(scene), width, height, palette)
@@ -97,7 +90,8 @@ class ZmanimWallpaperService : WallpaperService() {
                 scene.recycle()
             }
 
-            GlassCard.draw(canvas, plaqueBitmap, width, height, day, settings.location.name)
+            // Draw only the transparent card on top; never modify the rest of the screen.
+            GlassOverlay.draw(canvas, width, height, day, settings.location.name)
         }
 
         /** Astronomical + Jewish-calendar lookups are only recomputed once a day (or on location change). */
@@ -134,7 +128,6 @@ class ZmanimWallpaperService : WallpaperService() {
             val top = ((bitmap.height - srcH) / 2f).coerceAtLeast(0f)
             val src = Rect(left.toInt(), top.toInt(), (left + srcW).toInt(), (top + srcH).toInt())
             val dst = RectF(0f, 0f, width.toFloat(), height.toFloat())
-            canvas.drawColor(Color.BLACK)
             canvas.drawBitmap(bitmap, src, dst, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
         }
     }
