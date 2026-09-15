@@ -88,9 +88,16 @@ class ZmanimWallpaperService : WallpaperService() {
                 scene.recycle()
             }
 
-            // Repaint the complete frame before every animation tick. This keeps the seconds hand
-            // and all rotating gears clean, with no trails, while the selected wallpaper remains unchanged.
-            ReferenceBronzeCardV3.draw(canvas, width, height, day, settings.location.name)
+            // Image-first renderer: all decorative bronze work comes from a pre-rendered asset.
+            // Only live text and the clock hands are drawn each frame, which keeps everything sharp.
+            HybridImageBronzeCard.draw(
+                this@ZmanimWallpaperService,
+                canvas,
+                width,
+                height,
+                day,
+                settings.location.name
+            )
         }
 
         private fun dayFor(settings: ZmanimSettings): DayZmanim {
