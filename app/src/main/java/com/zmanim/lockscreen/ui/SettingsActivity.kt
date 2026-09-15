@@ -5,6 +5,8 @@ import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Geocoder
+import android.location.Location
 import android.location.LocationManager
 import android.os.Bundle
 import android.view.View
@@ -21,10 +23,12 @@ import com.zmanim.lockscreen.data.LocationConfig
 import com.zmanim.lockscreen.data.PresetLocations
 import com.zmanim.lockscreen.data.ZmanimSettings
 import com.zmanim.lockscreen.wallpaper.ZmanimWallpaperService
+import java.util.Locale
 
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var settings: ZmanimSettings
+    private var spinnerReady = false
 
     private val locationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -56,17 +60,21 @@ class SettingsActivity : AppCompatActivity() {
         )
 
         val currentIndex = PresetLocations.ALL.indexOfFirst { it.name == settings.location.name }
-        if (currentIndex >= 0) citySpinner.setSelection(currentIndex)
+        if (currentIndex >= 0) citySpinner.setSelection(currentIndex, false)
 
         citySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                // Ignore the spinner's automatic first callback so a GPS-resolved custom city
+                // is not overwritten by Jerusalem when this screen opens again.
+                if (!spinnerReady) return
                 settings.location = PresetLocations.ALL[position]
             }
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
+        citySpinner.post { spinnerReady = true }
 
         findViewById<Button>(R.id.useGpsButton).setOnClickListener {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
 
         findViewById<Button>(R.id.chooseBackgroundButton).setOnClickListener {
@@ -83,24 +91,49 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun resolveGpsLocation() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED
-        ) return
+        val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!hasFine && !hasCoarse) return
 
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
-        val last = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-            ?: locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+        val last = bestLastKnownLocation(locationManager)
 
         if (last == null) {
             Toast.makeText(this, R.string.settings_location_unavailable, Toast.LENGTH_SHORT).show()
             return
         }
 
-        settings.location = LocationConfig(
-            name = getString(R.string.settings_gps_label),
-            latitude = last.latitude,
-            longitude = last.longitude
-        )
-        Toast.makeText(this, R.string.settings_location_updated, Toast.LENGTH_SHORT).show()
+        // Reverse geocoding can touch the network, so do it off the main thread.
+        Thread {
+            val placeName = resolvePlaceName(last)
+            settings.location = LocationConfig(
+                name = placeName,
+                latitude = last.latitude,
+                longitude = last.longitude
+            )
+            runOnUiThread {
+                Toast.makeText(this, "$placeName — ${getString(R.string.settings_location_updated)}", Toast.LENGTH_SHORT).show()
+            }
+        }.start()
+    }
+
+    private fun bestLastKnownLocation(manager: LocationManager): Location? {
+        val providers = runCatching { manager.getProviders(true) }.getOrDefault(emptyList())
+        return providers.mapNotNull { provider ->
+            runCatching { manager.getLastKnownLocation(provider) }.getOrNull()
+        }.maxByOrNull { it.time }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun resolvePlaceName(location: Location): String {
+        val geocoder = Geocoder(this, Locale("he", "IL"))
+        val address = runCatching {
+            geocoder.getFromLocation(location.latitude, location.longitude, 1)?.firstOrNull()
+        }.getOrNull()
+
+        return address?.locality
+            ?: address?.subAdminArea
+            ?: address?.adminArea
+            ?: getString(R.string.settings_gps_label)
     }
 }

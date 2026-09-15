@@ -79,8 +79,6 @@ class ZmanimWallpaperService : WallpaperService() {
 
             val background = getBackground(settings.backgroundUri)
             if (background != null) {
-                // Repaint the whole frame from the selected image every second. This prevents
-                // moving clock hands from leaving trails or duplicate red second hands.
                 drawCenterCrop(canvas, background, width, height)
             } else {
                 val palette = SkyPalette.forTime(Calendar.getInstance().time, day.netzHachama, day.shkia)
@@ -90,16 +88,17 @@ class ZmanimWallpaperService : WallpaperService() {
                 scene.recycle()
             }
 
-            // IMPORTANT: use the antique reference renderer. Previous builds were still calling
-            // GlassOverlay, so the detailed bronze code in GlassCard never appeared on screen.
-            GlassCard.draw(canvas, null, width, height, day, settings.location.name)
+            // Repaint the complete frame before every animation tick. This keeps the seconds hand
+            // and all rotating gears clean, with no trails, while the selected wallpaper remains unchanged.
+            ReferenceBronzeCard.draw(canvas, width, height, day, settings.location.name)
         }
 
-        /** Astronomical + Jewish-calendar lookups are only recomputed once a day (or on location change). */
         private fun dayFor(settings: ZmanimSettings): DayZmanim {
-            val key = DAY_KEY_FORMAT.format(Calendar.getInstance().time) + "|" + settings.location.name
+            val location = settings.location
+            val key = DAY_KEY_FORMAT.format(Calendar.getInstance().time) +
+                "|${location.name}|${location.latitude}|${location.longitude}"
             cachedDay?.let { if (cachedDayKey == key) return it }
-            val fresh = ZmanimProvider(settings.location).today()
+            val fresh = ZmanimProvider(location).today()
             cachedDayKey = key
             cachedDay = fresh
             return fresh
@@ -134,7 +133,7 @@ class ZmanimWallpaperService : WallpaperService() {
     }
 
     companion object {
-        private const val REDRAW_INTERVAL_MS = 1_000L
+        private const val REDRAW_INTERVAL_MS = 250L
         private val DAY_KEY_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     }
 }
