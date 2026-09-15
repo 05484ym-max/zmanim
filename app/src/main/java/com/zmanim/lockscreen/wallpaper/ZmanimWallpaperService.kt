@@ -20,8 +20,8 @@ import java.util.Locale
 import kotlin.math.max
 
 /**
- * Live lock-screen wallpaper: a transparent zmanim glass layer over the user's chosen photo.
- * The renderer never darkens, blurs, tints or paints over the area outside the card.
+ * Live lock-screen wallpaper: the selected photo stays full-screen and untouched,
+ * while the antique zmanim card is drawn on top of it.
  */
 class ZmanimWallpaperService : WallpaperService() {
 
@@ -79,10 +79,10 @@ class ZmanimWallpaperService : WallpaperService() {
 
             val background = getBackground(settings.backgroundUri)
             if (background != null) {
-                // Draw the selected image directly, with no dimming/color overlay.
+                // Repaint the whole frame from the selected image every second. This prevents
+                // moving clock hands from leaving trails or duplicate red second hands.
                 drawCenterCrop(canvas, background, width, height)
             } else {
-                // Only used when the user has not selected a background image yet.
                 val palette = SkyPalette.forTime(Calendar.getInstance().time, day.netzHachama, day.shkia)
                 val scene = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 VintageScene.draw(Canvas(scene), width, height, palette)
@@ -90,8 +90,9 @@ class ZmanimWallpaperService : WallpaperService() {
                 scene.recycle()
             }
 
-            // Draw only the transparent card on top; never modify the rest of the screen.
-            GlassOverlay.draw(canvas, width, height, day, settings.location.name)
+            // IMPORTANT: use the antique reference renderer. Previous builds were still calling
+            // GlassOverlay, so the detailed bronze code in GlassCard never appeared on screen.
+            GlassCard.draw(canvas, null, width, height, day, settings.location.name)
         }
 
         /** Astronomical + Jewish-calendar lookups are only recomputed once a day (or on location change). */
