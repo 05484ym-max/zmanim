@@ -90,7 +90,7 @@ class ZmanimWallpaperService : WallpaperService() {
 
             // Repaint the complete frame before every animation tick. This keeps the seconds hand
             // and all rotating gears clean, with no trails, while the selected wallpaper remains unchanged.
-            ReferenceBronzeCard.draw(canvas, width, height, day, settings.location.name)
+            ReferenceBronzeCardV3.draw(canvas, width, height, day, settings.location.name)
         }
 
         private fun dayFor(settings: ZmanimSettings): DayZmanim {
