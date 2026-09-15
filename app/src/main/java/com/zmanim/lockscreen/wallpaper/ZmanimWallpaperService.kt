@@ -88,12 +88,11 @@ class ZmanimWallpaperService : WallpaperService() {
                 scene.recycle()
             }
 
-            // Repaint the background first every second, then draw one clean clock frame.
-            // This keeps the red seconds hand single and prevents trails/duplicates.
+            // Repaint the complete frame before every animation tick. This keeps the seconds hand
+            // and all rotating gears clean, with no trails, while the selected wallpaper remains unchanged.
             ReferenceBronzeCard.draw(canvas, width, height, day, settings.location.name)
         }
 
-        /** Astronomical + Jewish-calendar lookups are only recomputed once a day (or on location change). */
         private fun dayFor(settings: ZmanimSettings): DayZmanim {
             val location = settings.location
             val key = DAY_KEY_FORMAT.format(Calendar.getInstance().time) +
@@ -134,7 +133,7 @@ class ZmanimWallpaperService : WallpaperService() {
     }
 
     companion object {
-        private const val REDRAW_INTERVAL_MS = 1_000L
+        private const val REDRAW_INTERVAL_MS = 250L
         private val DAY_KEY_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     }
 }
