@@ -162,92 +162,149 @@ object ReferenceBronzeCard {
         val r = w * .196f
 
         canvas.drawCircle(cx, cy + r * .025f, r * 1.08f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(30, 0, 0, 0); setShadowLayer(r * .13f, 0f, r * .05f, Color.argb(140, 0, 0, 0))
+            color = Color.argb(30, 0, 0, 0)
+            setShadowLayer(r * .13f, 0f, r * .05f, Color.argb(140, 0, 0, 0))
         })
         val bezel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(cx - r * .25f, cy - r * .24f, r * 1.20f,
-                intArrayOf(GOLD_HIGHLIGHT, GOLD, GOLD_DARK, Color.parseColor("#2A180C")), floatArrayOf(0f, .42f, .74f, 1f), Shader.TileMode.CLAMP)
+            shader = RadialGradient(
+                cx - r * .25f, cy - r * .24f, r * 1.20f,
+                intArrayOf(GOLD_HIGHLIGHT, GOLD, GOLD_DARK, Color.parseColor("#2A180C")),
+                floatArrayOf(0f, .42f, .74f, 1f), Shader.TileMode.CLAMP
+            )
         }
         canvas.drawCircle(cx, cy, r * 1.07f, bezel)
         canvas.drawCircle(cx, cy, r * .98f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#21150C") })
 
-        // Dark movement plate. The wheels now read as parts of a real mechanism instead of bright stickers.
+        // Reference-like warm dial first: brighter and cleaner so numerals stay crisp.
         canvas.drawCircle(cx, cy, r * .91f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(cx - r * .22f, cy - r * .24f, r,
-                intArrayOf(Color.parseColor("#7B542C"), Color.parseColor("#49301A"), Color.parseColor("#1E140C")), null, Shader.TileMode.CLAMP)
+            shader = RadialGradient(
+                cx - r * .28f, cy - r * .30f, r,
+                intArrayOf(Color.parseColor("#E7C984"), Color.parseColor("#C79A54"), Color.parseColor("#85582C")),
+                floatArrayOf(0f, .58f, 1f), Shader.TileMode.CLAMP
+            )
         })
 
-        // Keep all mechanical parts behind the printed dial ring.
+        // The gear train is confined to the central movement area, away from the numeral ring.
         canvas.save()
-        canvas.clipPath(Path().apply { addCircle(cx, cy, r * .855f, Path.Direction.CW) })
-        val phase = (System.currentTimeMillis() % 180000L).toFloat() / 180000f * 360f
-        drawAntiqueGear(canvas, cx - r * .24f, cy + r * .02f, r * .31f, 15, phase,
-            Color.parseColor("#B47B32"), Color.parseColor("#765022"), Color.parseColor("#342012"))
-        drawAntiqueGear(canvas, cx + r * .27f, cy - r * .20f, r * .235f, 12, -phase * 1.30f,
-            Color.parseColor("#A86E2A"), Color.parseColor("#69451E"), Color.parseColor("#2F1D10"))
-        drawAntiqueGear(canvas, cx + r * .22f, cy + r * .31f, r * .165f, 10, phase * 1.85f,
-            Color.parseColor("#C18B3C"), Color.parseColor("#7A5223"), Color.parseColor("#352113"))
+        canvas.clipPath(Path().apply { addCircle(cx, cy, r * .50f, Path.Direction.CW) })
+        val baseAngle = (System.currentTimeMillis() % 240000L).toFloat() / 240000f * 360f
+
+        // Six physically-linked wheels. Adjacent gears rotate in opposite directions and
+        // scale by tooth count, so the train looks synchronized instead of arbitrary.
+        drawMeshedGear(canvas, cx - r * .25f, cy + r * .02f, r * .245f, 18, baseAngle, 0f,
+            Color.parseColor("#B57A33"), Color.parseColor("#734B20"), Color.parseColor("#322013"))
+        drawMeshedGear(canvas, cx + r * .10f, cy - r * .14f, r * .19f, 14, -baseAngle * (18f / 14f), 11f,
+            Color.parseColor("#C18B3A"), Color.parseColor("#7B5122"), Color.parseColor("#362115"))
+        drawMeshedGear(canvas, cx + r * .30f, cy + r * .09f, r * .145f, 10, baseAngle * (18f / 10f), 7f,
+            Color.parseColor("#9E6428"), Color.parseColor("#66411B"), Color.parseColor("#2C1B10"))
+        drawMeshedGear(canvas, cx + r * .10f, cy + r * .27f, r * .125f, 9, -baseAngle * (18f / 9f), 3f,
+            Color.parseColor("#C79647"), Color.parseColor("#7A5327"), Color.parseColor("#342116"))
+        drawMeshedGear(canvas, cx - r * .17f, cy - r * .25f, r * .11f, 8, -baseAngle * (18f / 8f), 18f,
+            Color.parseColor("#8D5A25"), Color.parseColor("#5C3A19"), Color.parseColor("#2A190F"))
+        drawMeshedGear(canvas, cx - r * .02f, cy + r * .02f, r * .085f, 7, baseAngle * (18f / 7f), 5f,
+            Color.parseColor("#D0A45B"), Color.parseColor("#84602C"), Color.parseColor("#382417"))
         canvas.restore()
 
-        // Aged glass integrates the mechanism into the dial and knocks back the saturation.
+        // Thin parchment/glass veil visually embeds the gears in the dial instead of sitting on top.
         canvas.drawCircle(cx, cy, r * .90f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(cx - r * .18f, cy - r * .24f, r,
-                intArrayOf(Color.argb(62, 244, 208, 137), Color.argb(42, 155, 104, 53), Color.argb(70, 31, 20, 12)), null, Shader.TileMode.CLAMP)
+            shader = RadialGradient(
+                cx - r * .20f, cy - r * .24f, r,
+                intArrayOf(Color.argb(56, 255, 232, 177), Color.argb(40, 205, 160, 92), Color.argb(48, 78, 47, 24)),
+                null, Shader.TileMode.CLAMP
+            )
         })
+
+        // Strong clean dial ring similar to the supplied reference.
         canvas.drawCircle(cx, cy, r * .865f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE; strokeWidth = r * .022f; color = Color.argb(230, 67, 39, 17)
+            style = Paint.Style.STROKE
+            strokeWidth = r * .024f
+            color = Color.argb(235, 73, 43, 18)
         })
         canvas.drawCircle(cx, cy, r * .835f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE; strokeWidth = r * .008f; color = Color.argb(125, 235, 190, 103)
+            style = Paint.Style.STROKE
+            strokeWidth = r * .008f
+            color = Color.argb(160, 244, 207, 123)
         })
 
-        val tick = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(230, 39, 25, 14); strokeCap = Paint.Cap.SQUARE }
+        val tick = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#2B1C10")
+            strokeCap = Paint.Cap.SQUARE
+        }
         for (i in 0 until 60) {
             val a = Math.toRadians((i * 6 - 90).toDouble())
-            val outer = r * .80f; val inner = if (i % 5 == 0) r * .63f else r * .72f
-            tick.strokeWidth = if (i % 5 == 0) r * .024f else r * .0085f
-            canvas.drawLine(cx + inner * cos(a).toFloat(), cy + inner * sin(a).toFloat(), cx + outer * cos(a).toFloat(), cy + outer * sin(a).toFloat(), tick)
-        }
-        val num = textPaint(r * .27f, INK, false).apply { textAlign = Paint.Align.CENTER; alpha = 235 }
-        listOf(12 to 0, 3 to 90, 6 to 180, 9 to 270).forEach { (n, deg) ->
-            val a = Math.toRadians((deg - 90).toDouble())
-            canvas.drawText(n.toString(), cx + r * .52f * cos(a).toFloat(), cy + r * .52f * sin(a).toFloat() + num.textSize * .34f, num)
+            val outer = r * .80f
+            val inner = if (i % 5 == 0) r * .62f else r * .71f
+            tick.strokeWidth = if (i % 5 == 0) r * .026f else r * .008f
+            canvas.drawLine(
+                cx + inner * cos(a).toFloat(), cy + inner * sin(a).toFloat(),
+                cx + outer * cos(a).toFloat(), cy + outer * sin(a).toFloat(), tick
+            )
         }
 
-        val now = Calendar.getInstance(); val sec = now.get(Calendar.SECOND)
-        val min = now.get(Calendar.MINUTE) + sec / 60f; val hour = now.get(Calendar.HOUR) + min / 60f
-        hand(canvas, cx, cy, r * .45f, hour * 30f, r * .062f, Color.parseColor("#16100B"))
-        hand(canvas, cx, cy, r * .66f, min * 6f, r * .041f, Color.parseColor("#16100B"))
+        // Crisp numeral pads keep 12/3/6/9 readable even over the mechanical center.
+        val numeralFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 239, 209, 143) }
+        listOf(12 to 0, 3 to 90, 6 to 180, 9 to 270).forEach { (_, deg) ->
+            val a = Math.toRadians((deg - 90).toDouble())
+            val nx = cx + r * .53f * cos(a).toFloat()
+            val ny = cy + r * .53f * sin(a).toFloat()
+            canvas.drawCircle(nx, ny, r * .13f, numeralFill)
+        }
+
+        val num = textPaint(r * .285f, Color.parseColor("#25170D"), false).apply {
+            textAlign = Paint.Align.CENTER
+            alpha = 255
+            setShadowLayer(r * .012f, 0f, r * .008f, Color.argb(80, 255, 232, 170))
+        }
+        listOf(12 to 0, 3 to 90, 6 to 180, 9 to 270).forEach { (n, deg) ->
+            val a = Math.toRadians((deg - 90).toDouble())
+            canvas.drawText(
+                n.toString(),
+                cx + r * .53f * cos(a).toFloat(),
+                cy + r * .53f * sin(a).toFloat() + num.textSize * .34f,
+                num
+            )
+        }
+
+        val now = Calendar.getInstance()
+        val sec = now.get(Calendar.SECOND)
+        val min = now.get(Calendar.MINUTE) + sec / 60f
+        val hour = now.get(Calendar.HOUR) + min / 60f
+        hand(canvas, cx, cy, r * .45f, hour * 30f, r * .064f, Color.parseColor("#16100B"))
+        hand(canvas, cx, cy, r * .66f, min * 6f, r * .042f, Color.parseColor("#16100B"))
         hand(canvas, cx, cy, r * .73f, sec * 6f, r * .012f, RED)
         canvas.drawCircle(cx, cy, r * .060f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(cx - r * .02f, cy - r * .02f, r * .06f,
-                intArrayOf(GOLD_HIGHLIGHT, GOLD, GOLD_DARK), null, Shader.TileMode.CLAMP)
+            shader = RadialGradient(
+                cx - r * .02f, cy - r * .02f, r * .06f,
+                intArrayOf(GOLD_HIGHLIGHT, GOLD, GOLD_DARK), null, Shader.TileMode.CLAMP
+            )
         })
         canvas.drawCircle(cx, cy, r * .023f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = INK })
     }
 
-    private fun drawAntiqueGear(
+    private fun drawMeshedGear(
         canvas: Canvas,
         cx: Float,
         cy: Float,
         r: Float,
         teeth: Int,
         rotation: Float,
+        phaseOffset: Float,
         light: Int,
         mid: Int,
         dark: Int
     ) {
         canvas.save()
-        canvas.rotate(rotation, cx, cy)
+        canvas.rotate(rotation + phaseOffset, cx, cy)
 
         val path = Path()
-        val steps = teeth * 6
+        val steps = teeth * 8
         for (i in 0 until steps) {
             val a = Math.toRadians((i * 360f / steps - 90f).toDouble())
-            val rr = when (i % 6) {
-                0, 5 -> r * .76f
-                1, 4 -> r * .90f
-                else -> r
+            val rr = when (i % 8) {
+                0, 7 -> r * .78f
+                1, 6 -> r * .88f
+                2, 5 -> r
+                else -> r * .96f
             }
             val x = cx + rr * cos(a).toFloat()
             val y = cy + rr * sin(a).toFloat()
@@ -255,66 +312,86 @@ object ReferenceBronzeCard {
         }
         path.close()
 
-        // Soft mechanical shadow gives actual depth between meshing wheels.
         canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(120, 17, 10, 6)
-            setShadowLayer(r * .10f, r * .025f, r * .045f, Color.argb(190, 0, 0, 0))
+            color = Color.argb(115, 15, 8, 5)
+            setShadowLayer(r * .09f, r * .025f, r * .045f, Color.argb(170, 0, 0, 0))
+        })
+        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx - r * .30f, cy - r * .32f, r * 1.08f,
+                intArrayOf(light, mid, dark), floatArrayOf(0f, .58f, 1f), Shader.TileMode.CLAMP
+            )
+        })
+        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = r * .042f
+            color = Color.argb(220, 46, 27, 14)
         })
 
-        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(cx - r * .28f, cy - r * .30f, r * 1.05f,
-                intArrayOf(light, mid, dark), floatArrayOf(0f, .56f, 1f), Shader.TileMode.CLAMP)
-        })
-        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE; strokeWidth = r * .055f; color = Color.argb(220, 46, 28, 15)
-        })
-        canvas.drawCircle(cx, cy, r * .67f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE; strokeWidth = r * .035f; color = Color.argb(125, 244, 198, 104)
+        canvas.drawCircle(cx, cy, r * .68f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = r * .030f
+            color = Color.argb(105, 245, 204, 112)
         })
 
-        // Skeletonized wheel: dark cut-outs and narrow forged spokes instead of cartoon solid spokes.
+        // Five cut-outs and forged spokes create a watch-movement look instead of a flat icon.
         val holes = 5
         for (i in 0 until holes) {
             val a = Math.toRadians((i * 360.0 / holes) - 90.0)
-            val hx = cx + r * .44f * cos(a).toFloat()
-            val hy = cy + r * .44f * sin(a).toFloat()
-            canvas.drawCircle(hx, hy, r * .135f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = RadialGradient(hx - r * .03f, hy - r * .03f, r * .15f,
-                    intArrayOf(Color.parseColor("#1A1009"), Color.parseColor("#4A2E17")), null, Shader.TileMode.CLAMP)
+            val hx = cx + r * .43f * cos(a).toFloat()
+            val hy = cy + r * .43f * sin(a).toFloat()
+            canvas.drawCircle(hx, hy, r * .13f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(
+                    hx - r * .03f, hy - r * .03f, r * .15f,
+                    intArrayOf(Color.parseColor("#181009"), Color.parseColor("#442B16")), null, Shader.TileMode.CLAMP
+                )
             })
-            canvas.drawCircle(hx, hy, r * .135f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE; strokeWidth = r * .022f; color = Color.argb(150, 224, 166, 78)
+            canvas.drawCircle(hx, hy, r * .13f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = r * .018f
+                color = Color.argb(125, 222, 166, 80)
             })
         }
 
         for (i in 0 until holes) {
             val a = Math.toRadians((i * 360.0 / holes) - 90.0)
-            val x1 = cx + r * .18f * cos(a).toFloat(); val y1 = cy + r * .18f * sin(a).toFloat()
-            val x2 = cx + r * .56f * cos(a).toFloat(); val y2 = cy + r * .56f * sin(a).toFloat()
+            val x1 = cx + r * .17f * cos(a).toFloat()
+            val y1 = cy + r * .17f * sin(a).toFloat()
+            val x2 = cx + r * .57f * cos(a).toFloat()
+            val y2 = cy + r * .57f * sin(a).toFloat()
             canvas.drawLine(x1, y1, x2, y2, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(150, 39, 23, 12); strokeWidth = r * .10f; strokeCap = Paint.Cap.ROUND
+                color = Color.argb(145, 35, 21, 11)
+                strokeWidth = r * .085f
+                strokeCap = Paint.Cap.ROUND
             })
-            canvas.drawLine(x1 - r * .01f, y1 - r * .01f, x2 - r * .01f, y2 - r * .01f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(120, 235, 184, 91); strokeWidth = r * .030f; strokeCap = Paint.Cap.ROUND
+            canvas.drawLine(x1 - r * .009f, y1 - r * .009f, x2 - r * .009f, y2 - r * .009f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(105, 238, 188, 94)
+                strokeWidth = r * .024f
+                strokeCap = Paint.Cap.ROUND
             })
         }
 
-        // Hub, axle and old scratches/patina.
-        canvas.drawCircle(cx, cy, r * .235f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(cx - r * .07f, cy - r * .08f, r * .24f,
-                intArrayOf(light, mid, dark), null, Shader.TileMode.CLAMP)
+        canvas.drawCircle(cx, cy, r * .22f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx - r * .06f, cy - r * .07f, r * .23f,
+                intArrayOf(light, mid, dark), null, Shader.TileMode.CLAMP
+            )
         })
-        canvas.drawCircle(cx, cy, r * .085f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#21140B") })
-        canvas.drawCircle(cx, cy, r * .045f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(220, 216, 157, 70) })
+        canvas.drawCircle(cx, cy, r * .075f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#21140B") })
+        canvas.drawCircle(cx, cy, r * .040f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(220, 220, 163, 76) })
 
-        val scratch = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = r * .010f; strokeCap = Paint.Cap.ROUND }
-        for (i in 0 until 7) {
-            val a = Math.toRadians((i * 47 + 18).toDouble())
-            val sr = r * (.52f + (i % 3) * .06f)
-            scratch.color = if (i % 2 == 0) Color.argb(65, 245, 205, 120) else Color.argb(70, 35, 20, 10)
+        val scratch = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            strokeWidth = r * .008f
+            strokeCap = Paint.Cap.ROUND
+        }
+        for (i in 0 until 6) {
+            val a = Math.toRadians((i * 53 + 17).toDouble())
+            val sr = r * (.50f + (i % 3) * .06f)
+            scratch.color = if (i % 2 == 0) Color.argb(48, 245, 207, 124) else Color.argb(55, 34, 20, 10)
             canvas.drawLine(
                 cx + sr * cos(a).toFloat(), cy + sr * sin(a).toFloat(),
-                cx + (sr + r * .15f) * cos(a + .06).toFloat(), cy + (sr + r * .15f) * sin(a + .06).toFloat(), scratch
+                cx + (sr + r * .13f) * cos(a + .05).toFloat(),
+                cy + (sr + r * .13f) * sin(a + .05).toFloat(), scratch
             )
         }
         canvas.restore()
