@@ -62,8 +62,16 @@ object HybridImageBronzeCard {
         val sy = card.height() / DESIGN_H
 
         val bitmap = cachedBase?.takeIf { !it.isRecycled }
-            ?: BitmapFactory.decodeResource(context.resources, R.drawable.zmanim_bronze_static_v4)
-                .also { cachedBase = it }
+            ?: runCatching {
+                BitmapFactory.decodeResource(context.resources, R.drawable.zmanim_bronze_static_v4)
+            }.getOrNull()?.also { cachedBase = it }
+
+        // Never let a bad/missing image resource crash Android's live-wallpaper preview.
+        // If decoding ever fails, keep the wallpaper usable with the previous renderer.
+        if (bitmap == null) {
+            ReferenceBronzeCard.draw(canvas, width, height, day, locationName)
+            return
+        }
 
         canvas.drawBitmap(
             bitmap,
