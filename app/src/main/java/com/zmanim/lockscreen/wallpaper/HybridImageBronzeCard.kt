@@ -8,8 +8,6 @@ import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
@@ -27,26 +25,28 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Image-first antique bronze renderer.
+ * Single-layer antique bronze renderer.
  *
- * A real bronze image provides the material/texture, while the clean v4 image is
- * used as a semi-transparent layout mask. Live text, clock hands and the
- * synchronized mechanical gear train are rendered on top.
+ * The previous version composited two complete card images and then drew live
+ * content over both, which caused the duplicated labels/numbers visible in the
+ * wallpaper preview. This version uses only the bronze texture image as material.
+ * All structure (frame, dial, grid, ornaments), live text, hands and gears are
+ * drawn exactly once in code.
  */
 object HybridImageBronzeCard {
     private const val DESIGN_W = 1200f
     private const val DESIGN_H = 1620f
 
-    private val GOLD = Color.parseColor("#E7C078")
-    private val GOLD_LIGHT = Color.parseColor("#FFE3A1")
-    private val GOLD_DARK = Color.parseColor("#6B431E")
-    private val BRONZE_DARK = Color.parseColor("#2A170C")
+    private val GOLD = Color.parseColor("#D9A95A")
+    private val GOLD_LIGHT = Color.parseColor("#F7D88F")
+    private val GOLD_DARK = Color.parseColor("#6C421D")
+    private val BRONZE_DARK = Color.parseColor("#2B180D")
     private val INK = Color.parseColor("#21150D")
     private val RED = Color.parseColor("#D72F22")
+    private val IVORY = Color.parseColor("#EBCB84")
     private val SERIF = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
     private val SERIF_BOLD = Typeface.create(Typeface.SERIF, Typeface.BOLD)
 
-    @Volatile private var cachedLayout: Bitmap? = null
     @Volatile private var cachedBronze: Bitmap? = null
     @Volatile private var gear28: Bitmap? = null
     @Volatile private var gear20: Bitmap? = null
@@ -77,26 +77,27 @@ object HybridImageBronzeCard {
         val bronze = cachedBronze?.takeIf { !it.isRecycled }
             ?: runCatching { BitmapFactory.decodeResource(context.resources, R.drawable.plaque_bronze) }
                 .getOrNull()?.also { cachedBronze = it }
-        val layout = cachedLayout?.takeIf { !it.isRecycled }
-            ?: runCatching { BitmapFactory.decodeResource(context.resources, R.drawable.zmanim_bronze_static_v4) }
-                .getOrNull()?.also { cachedLayout = it }
 
-        if (bronze == null || layout == null) {
+        if (bronze == null) {
             ReferenceBronzeCard.draw(canvas, width, height, day, locationName)
             return
         }
 
-        // 1) Real bronze image as the physical material of the card.
-        canvas.drawBitmap(
-            bronze,
-            null,
-            card,
-            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG).apply {
-                alpha = 244
-            }
-        )
+        drawBronzeBase(canvas, bronze, card)
+        drawAntiqueFrame(canvas, card)
+        drawClockFace(canvas, card, sx, sy)
+        drawMechanicalClock(canvas, card, sx, sy)
+        drawHeader(canvas, card, sx, sy, day, locationName)
+        drawGrid(canvas, card, sx, sy, day)
+        drawFooter(canvas, card, sx, sy, day)
+    }
 
-        // 2) Dark aged glaze. It gives the bronze depth without hiding the wallpaper completely.
+    private fun drawBronzeBase(canvas: Canvas, bronze: Bitmap, card: RectF) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG).apply {
+            alpha = 246
+        }
+        canvas.drawBitmap(bronze, null, card, p)
+
         canvas.drawRoundRect(
             card,
             card.width() * .035f,
@@ -108,77 +109,122 @@ object HybridImageBronzeCard {
                     card.right,
                     card.bottom,
                     intArrayOf(
-                        Color.argb(26, 255, 221, 146),
-                        Color.argb(78, 73, 39, 17),
-                        Color.argb(108, 34, 18, 9)
+                        Color.argb(18, 255, 227, 158),
+                        Color.argb(52, 83, 48, 23),
+                        Color.argb(88, 31, 18, 10)
                     ),
-                    floatArrayOf(0f, .48f, 1f),
+                    floatArrayOf(0f, .52f, 1f),
                     Shader.TileMode.CLAMP
                 )
             }
         )
-
-        // 3) The image-first structural layer: frame, clock dial, grid and ornaments.
-        // Keeping it partially transparent lets the richer real-bronze texture show through.
-        canvas.drawBitmap(
-            layout,
-            null,
-            card,
-            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG).apply {
-                alpha = 174
-            }
-        )
-
-        drawAntiqueFrame(canvas, card)
-        drawMechanicalClock(context, canvas, card, sx, sy)
-        drawHeader(canvas, card, sx, sy, day, locationName)
-        drawGrid(canvas, card, sx, sy, day)
-        drawFooter(canvas, card, sx, sy, day)
     }
 
     private fun drawAntiqueFrame(canvas: Canvas, card: RectF) {
-        val radius = card.width() * .035f
-        val frame = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val radius = card.width() * .038f
+        val outer = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = card.width() * .0085f
+            strokeWidth = card.width() * .012f
             shader = LinearGradient(
                 card.left,
                 card.top,
                 card.right,
                 card.bottom,
                 intArrayOf(
-                    Color.parseColor("#F5D995"),
-                    Color.parseColor("#A66B2B"),
-                    Color.parseColor("#5C3518"),
-                    Color.parseColor("#E0B567")
+                    Color.parseColor("#F3D487"),
+                    Color.parseColor("#A56A2B"),
+                    Color.parseColor("#593117"),
+                    Color.parseColor("#D9A95A")
                 ),
                 null,
                 Shader.TileMode.CLAMP
             )
         }
-        canvas.drawRoundRect(card, radius, radius, frame)
+        canvas.drawRoundRect(card, radius, radius, outer)
 
-        val inner = RectF(card).apply { inset(card.width() * .018f, card.width() * .018f) }
-        canvas.drawRoundRect(
-            inner,
-            radius * .76f,
-            radius * .76f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                strokeWidth = card.width() * .0023f
-                color = Color.argb(220, 243, 202, 122)
-            }
-        )
+        val inner = RectF(card).apply { inset(card.width() * .021f, card.width() * .021f) }
+        canvas.drawRoundRect(inner, radius * .72f, radius * .72f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = card.width() * .0028f
+            color = Color.argb(230, 238, 193, 105)
+        })
+
+        drawCornerOrnament(canvas, inner.left + 30f, inner.top + 30f, 1f, 1f, card.width() * .12f)
+        drawCornerOrnament(canvas, inner.right - 30f, inner.top + 30f, -1f, 1f, card.width() * .12f)
+        drawCornerOrnament(canvas, inner.left + 30f, inner.bottom - 30f, 1f, -1f, card.width() * .12f)
+        drawCornerOrnament(canvas, inner.right - 30f, inner.bottom - 30f, -1f, -1f, card.width() * .12f)
     }
 
-    private fun drawHeader(
-        canvas: Canvas,
-        card: RectF,
-        sx: Float,
-        sy: Float,
-        day: DayZmanim,
-        locationName: String
-    ) {
+    private fun drawCornerOrnament(canvas: Canvas, x: Float, y: Float, sx: Float, sy: Float, size: Float) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = size * .045f
+            strokeCap = Paint.Cap.ROUND
+            color = Color.argb(225, 231, 190, 103)
+        }
+        val p = Path()
+        p.moveTo(x, y + sy * size * .65f)
+        p.cubicTo(x + sx * size * .08f, y + sy * size * .28f, x + sx * size * .28f, y + sy * size * .12f, x + sx * size * .58f, y)
+        p.cubicTo(x + sx * size * .38f, y + sy * size * .16f, x + sx * size * .25f, y + sy * size * .34f, x + sx * size * .16f, y + sy * size * .62f)
+        canvas.drawPath(p, paint)
+        canvas.drawCircle(x + sx * size * .26f, y + sy * size * .27f, size * .07f, paint)
+    }
+
+    private fun drawClockFace(canvas: Canvas, card: RectF, sx: Float, sy: Float) {
+        val cx = card.left + 325f * sx
+        val cy = card.top + 310f * sy
+        val r = 230f * sx
+
+        canvas.drawCircle(cx + r * .02f, cy + r * .035f, r * 1.02f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(120, 0, 0, 0)
+        })
+        canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx - r * .28f,
+                cy - r * .32f,
+                r * 1.05f,
+                intArrayOf(Color.parseColor("#F1DDA4"), Color.parseColor("#D2AD61"), Color.parseColor("#8C5B25")),
+                floatArrayOf(0f, .72f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        })
+        canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = r * .055f
+            color = Color.parseColor("#4E2D15")
+        })
+        canvas.drawCircle(cx, cy, r * .91f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = r * .012f
+            color = Color.parseColor("#8A5A27")
+        })
+
+        val tick = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = INK; strokeCap = Paint.Cap.ROUND }
+        repeat(60) { i ->
+            val a = Math.toRadians((i * 6.0 - 90.0))
+            val major = i % 5 == 0
+            val inner = if (major) r * .76f else r * .82f
+            val outer = r * .88f
+            tick.strokeWidth = if (major) r * .018f else r * .008f
+            canvas.drawLine(
+                cx + inner * cos(a).toFloat(), cy + inner * sin(a).toFloat(),
+                cx + outer * cos(a).toFloat(), cy + outer * sin(a).toFloat(), tick
+            )
+        }
+
+        val numeral = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
+            color = INK
+            textAlign = Paint.Align.CENTER
+            typeface = SERIF_BOLD
+            textSize = r * .24f
+        }
+        canvas.drawText("12", cx, cy - r * .62f, numeral)
+        canvas.drawText("3", cx + r * .64f, cy + r * .08f, numeral)
+        canvas.drawText("6", cx, cy + r * .76f, numeral)
+        canvas.drawText("9", cx - r * .64f, cy + r * .08f, numeral)
+    }
+
+    private fun drawHeader(canvas: Canvas, card: RectF, sx: Float, sy: Float, day: DayZmanim, locationName: String) {
         drawRtl(canvas, "זמני היום", box(card, sx, sy, 610f, 105f, 1110f, 220f), 72f * sx, true)
         drawRtl(canvas, locationName, box(card, sx, sy, 610f, 235f, 985f, 325f), 42f * sx, false)
         drawRtl(canvas, day.hebrewDate, box(card, sx, sy, 555f, 340f, 1085f, 425f), 40f * sx, true)
@@ -192,14 +238,17 @@ object HybridImageBronzeCard {
         val bottom = 1115f
         val cw = (right - left) / 4f
         val ch = (bottom - top) / 2f
-
         val grid = box(card, sx, sy, left, top, right, bottom)
+
+        canvas.drawRoundRect(grid, 30f * sx, 30f * sx, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(94, 35, 19, 10)
+        })
         val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 3.2f * sx
-            color = Color.argb(230, 220, 166, 83)
+            strokeWidth = 3.1f * sx
+            color = Color.argb(235, 218, 164, 82)
         }
-        canvas.drawRoundRect(grid, 28f * sx, 28f * sx, border)
+        canvas.drawRoundRect(grid, 30f * sx, 30f * sx, border)
         for (i in 1..3) {
             val x = card.left + (left + cw * i) * sx
             canvas.drawLine(x, grid.top, x, grid.bottom, border)
@@ -217,26 +266,13 @@ object HybridImageBronzeCard {
             "מנחה קטנה" to day.minchaKetana,
             "מנחה גדולה" to day.minchaGedola
         )
-
         values.forEachIndexed { index, item ->
             val col = index % 4
             val row = index / 4
             val x1 = left + col * cw
             val y1 = top + row * ch
-            drawRtl(
-                canvas,
-                item.first,
-                box(card, sx, sy, x1 + 8f, y1 + 18f, x1 + cw - 8f, y1 + 112f),
-                33f * sx,
-                true
-            )
-            drawLtr(
-                canvas,
-                ZmanimProvider.formatTime(item.second),
-                box(card, sx, sy, x1 + 8f, y1 + 112f, x1 + cw - 8f, y1 + ch - 14f),
-                51f * sx,
-                true
-            )
+            drawRtl(canvas, item.first, box(card, sx, sy, x1 + 8f, y1 + 18f, x1 + cw - 8f, y1 + 112f), 33f * sx, true)
+            drawLtr(canvas, ZmanimProvider.formatTime(item.second), box(card, sx, sy, x1 + 8f, y1 + 112f, x1 + cw - 8f, y1 + ch - 14f), 51f * sx, true)
         }
     }
 
@@ -256,45 +292,17 @@ object HybridImageBronzeCard {
         }
     }
 
-    private fun drawMechanicalClock(
-        context: Context,
-        canvas: Canvas,
-        card: RectF,
-        sx: Float,
-        sy: Float
-    ) {
+    private fun drawMechanicalClock(canvas: Canvas, card: RectF, sx: Float, sy: Float) {
         val cx = card.left + 325f * sx
         val cy = card.top + 310f * sy
         val r = 230f * sx
 
-        // The movement is deliberately restricted to the center of the dial so
-        // 12/3/6/9 remain crisp and visually dominant, like the reference image.
-        val clip = Path().apply { addCircle(cx, cy, r * .53f, Path.Direction.CW) }
+        val clip = Path().apply { addCircle(cx, cy, r * .48f, Path.Direction.CW) }
         canvas.save()
         canvas.clipPath(clip)
 
-        canvas.drawCircle(
-            cx,
-            cy,
-            r * .50f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = RadialGradient(
-                    cx - r * .12f,
-                    cy - r * .15f,
-                    r * .55f,
-                    intArrayOf(
-                        Color.argb(52, 244, 208, 131),
-                        Color.argb(105, 94, 54, 24),
-                        Color.argb(145, 31, 19, 12)
-                    ),
-                    null,
-                    Shader.TileMode.CLAMP
-                )
-            }
-        )
-
         val elapsedSeconds = System.currentTimeMillis() / 1000f
-        val base = (elapsedSeconds * 4f) % 360f // one revolution every 90 seconds
+        val base = (elapsedSeconds * 2.4f) % 360f
 
         val g28 = gear28 ?: buildGearBitmap(28, 6).also { gear28 = it }
         val g20 = gear20 ?: buildGearBitmap(20, 5).also { gear20 = it }
@@ -302,25 +310,17 @@ object HybridImageBronzeCard {
         val g14 = gear14 ?: buildGearBitmap(14, 5).also { gear14 = it }
         val g12 = gear12 ?: buildGearBitmap(12, 4).also { gear12 = it }
 
-        // One linked train. Adjacent gears reverse direction and their angular
-        // speed follows the tooth-count ratio, so they read as a single mechanism.
-        drawGear(canvas, g28, cx - r * .05f, cy + r * .03f, r * .205f, base)
-        drawGear(canvas, g20, cx + r * .285f, cy + r * .015f, r * .148f, -base * 28f / 20f + 7f)
-        drawGear(canvas, g16, cx + r * .15f, cy + r * .285f, r * .120f, base * 28f / 16f + 13f)
-        drawGear(canvas, g14, cx - r * .12f, cy + r * .315f, r * .108f, -base * 28f / 14f + 5f)
-        drawGear(canvas, g20, cx - r * .315f, cy + r * .04f, r * .145f, -base * 28f / 20f + 19f)
-        drawGear(canvas, g12, cx - r * .10f, cy - r * .285f, r * .092f, -base * 28f / 12f + 11f)
+        drawGear(canvas, g28, cx - r * .03f, cy + r * .01f, r * .19f, base)
+        drawGear(canvas, g20, cx + r * .25f, cy + r * .02f, r * .14f, -base * 28f / 20f + 8f)
+        drawGear(canvas, g16, cx + r * .12f, cy + r * .25f, r * .115f, base * 28f / 16f + 14f)
+        drawGear(canvas, g14, cx - r * .11f, cy + r * .27f, r * .102f, -base * 28f / 14f + 6f)
+        drawGear(canvas, g20, cx - r * .27f, cy + r * .02f, r * .14f, -base * 28f / 20f + 20f)
+        drawGear(canvas, g12, cx - r * .08f, cy - r * .25f, r * .09f, -base * 28f / 12f + 12f)
         canvas.restore()
 
-        // Thin parchment veil integrates the movement into the antique dial.
-        canvas.drawCircle(
-            cx,
-            cy,
-            r * .47f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(22, 236, 199, 122)
-            }
-        )
+        canvas.drawCircle(cx, cy, r * .46f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(18, 237, 202, 127)
+        })
 
         drawClockHands(canvas, cx, cy, r)
     }
@@ -343,104 +343,42 @@ object HybridImageBronzeCard {
         }
         path.close()
 
-        val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(170, 0, 0, 0)
-            setShadowLayer(10f, 3f, 6f, Color.argb(190, 0, 0, 0))
-        }
-        canvas.drawPath(path, shadow)
-
-        val body = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                c - size * .16f,
-                c - size * .18f,
-                size * .56f,
-                intArrayOf(
-                    Color.parseColor("#F2D086"),
-                    Color.parseColor("#B77931"),
-                    Color.parseColor("#74441D"),
-                    Color.parseColor("#332014")
-                ),
-                floatArrayOf(0f, .42f, .77f, 1f),
-                Shader.TileMode.CLAMP
+                c - size * .16f, c - size * .18f, size * .56f,
+                intArrayOf(Color.parseColor("#E8C16C"), Color.parseColor("#A76A2A"), Color.parseColor("#6A3E19"), Color.parseColor("#2B1A0F")),
+                floatArrayOf(0f, .42f, .77f, 1f), Shader.TileMode.CLAMP
             )
-            style = Paint.Style.FILL
-        }
-        canvas.drawPath(path, body)
-        canvas.drawPath(
-            path,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                strokeWidth = 4.5f
-                color = Color.parseColor("#4B2D16")
-            }
-        )
-
-        // Dark movement plate under the spokes.
-        canvas.drawCircle(c, c, size * .285f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#55331A") })
+        })
+        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 4.5f
+            color = Color.parseColor("#4B2D16")
+        })
+        canvas.drawCircle(c, c, size * .285f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#4C2D18") })
 
         val spokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             strokeWidth = size * .055f
             strokeCap = Paint.Cap.ROUND
-            shader = LinearGradient(
-                c - size * .25f,
-                c - size * .25f,
-                c + size * .25f,
-                c + size * .25f,
-                intArrayOf(Color.parseColor("#E7BC69"), Color.parseColor("#8A5425")),
-                null,
-                Shader.TileMode.CLAMP
-            )
+            shader = LinearGradient(c - size * .25f, c - size * .25f, c + size * .25f, c + size * .25f,
+                intArrayOf(Color.parseColor("#E0B45F"), Color.parseColor("#7B4920")), null, Shader.TileMode.CLAMP)
         }
         repeat(spokes) { index ->
             val a = (2.0 * PI * index / spokes - PI / 2.0).toFloat()
             canvas.drawLine(
-                c + size * .085f * cos(a),
-                c + size * .085f * sin(a),
-                c + size * .255f * cos(a),
-                c + size * .255f * sin(a),
-                spokePaint
+                c + size * .085f * cos(a), c + size * .085f * sin(a),
+                c + size * .255f * cos(a), c + size * .255f * sin(a), spokePaint
             )
         }
-
-        canvas.drawCircle(c, c, size * .090f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#B97731") })
-        canvas.drawCircle(c, c, size * .050f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#2A1A10") })
-        canvas.drawCircle(
-            c,
-            c,
-            size * .090f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                strokeWidth = 4f
-                color = Color.parseColor("#F1CF82")
-            }
-        )
-
-        // Deterministic patina marks keep the gears from looking like flat icons.
-        val patina = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(58, 34, 21, 13) }
-        repeat(12) { i ->
-            val a = (2.0 * PI * i / 12.0 + teeth * .07).toFloat()
-            val rr = size * (.20f + (i % 3) * .045f)
-            canvas.drawCircle(c + rr * cos(a), c + rr * sin(a), 3.2f + (i % 2), patina)
-        }
+        canvas.drawCircle(c, c, size * .090f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#B06D2B") })
+        canvas.drawCircle(c, c, size * .050f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#24160D") })
         return bitmap
     }
 
-    private fun drawGear(
-        canvas: Canvas,
-        bitmap: Bitmap,
-        cx: Float,
-        cy: Float,
-        radius: Float,
-        angle: Float
-    ) {
+    private fun drawGear(canvas: Canvas, bitmap: Bitmap, cx: Float, cy: Float, radius: Float, angle: Float) {
         canvas.save()
         canvas.rotate(angle, cx, cy)
-        canvas.drawBitmap(
-            bitmap,
-            null,
-            RectF(cx - radius, cy - radius, cx + radius, cy + radius),
-            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        )
+        canvas.drawBitmap(bitmap, null, RectF(cx - radius, cy - radius, cx + radius, cy + radius), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
         canvas.restore()
     }
 
@@ -453,7 +391,6 @@ object HybridImageBronzeCard {
         hand(canvas, cx, cy, r * .45f, hours * 30f, r * .058f, INK)
         hand(canvas, cx, cy, r * .67f, minutes * 6f, r * .036f, INK)
         hand(canvas, cx, cy, r * .78f, seconds * 6f, r * .010f, RED)
-
         canvas.drawCircle(cx, cy, r * .046f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = GOLD_LIGHT })
         canvas.drawCircle(cx, cy, r * .021f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BRONZE_DARK })
     }
@@ -462,49 +399,30 @@ object HybridImageBronzeCard {
         val angle = Math.toRadians((deg - 90f).toDouble())
         val x = cx + len * cos(angle).toFloat()
         val y = cy + len * sin(angle).toFloat()
-
-        canvas.drawLine(
-            cx,
-            cy,
-            x,
-            y + stroke * .16f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = Color.argb(115, 0, 0, 0)
-                strokeWidth = stroke * 1.22f
-                strokeCap = Paint.Cap.ROUND
-            }
-        )
-        canvas.drawLine(
-            cx,
-            cy,
-            x,
-            y,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = color
-                strokeWidth = stroke
-                strokeCap = Paint.Cap.ROUND
-            }
-        )
+        canvas.drawLine(cx, cy, x, y, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = Color.argb(100, 0, 0, 0)
+            strokeWidth = stroke * 1.22f
+            strokeCap = Paint.Cap.ROUND
+        })
+        canvas.drawLine(cx, cy, x, y, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            strokeWidth = stroke
+            strokeCap = Paint.Cap.ROUND
+        })
     }
 
-    private fun drawRtl(canvas: Canvas, text: String, rect: RectF, size: Float, bold: Boolean) {
-        drawText(canvas, text, rect, size, bold, true)
-    }
-
-    private fun drawLtr(canvas: Canvas, text: String, rect: RectF, size: Float, bold: Boolean) {
-        drawText(canvas, text, rect, size, bold, false)
-    }
+    private fun drawRtl(canvas: Canvas, text: String, rect: RectF, size: Float, bold: Boolean) = drawText(canvas, text, rect, size, bold, true)
+    private fun drawLtr(canvas: Canvas, text: String, rect: RectF, size: Float, bold: Boolean) = drawText(canvas, text, rect, size, bold, false)
 
     private fun drawText(canvas: Canvas, text: String, rect: RectF, size: Float, bold: Boolean, rtl: Boolean) {
         val typeface = if (bold) SERIF_BOLD else SERIF
         val flags = Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG
-
         val outline = TextPaint(flags).apply {
             textSize = size
             color = Color.parseColor("#3A2412")
             this.typeface = typeface
             style = Paint.Style.STROKE
-            strokeWidth = (size * .045f).coerceAtLeast(.9f)
+            strokeWidth = (size * .036f).coerceAtLeast(.8f)
             strokeJoin = Paint.Join.ROUND
         }
         val fill = TextPaint(flags).apply {
@@ -513,28 +431,11 @@ object HybridImageBronzeCard {
             this.typeface = typeface
             style = Paint.Style.FILL
         }
-        val warm = TextPaint(flags).apply {
-            textSize = size
-            color = Color.argb(100, 142, 86, 34)
-            this.typeface = typeface
-            style = Paint.Style.STROKE
-            strokeWidth = (size * .018f).coerceAtLeast(.6f)
-        }
-
-        drawLayout(canvas, text, rect, outline, rtl, 0f, size * .012f)
-        drawLayout(canvas, text, rect, warm, rtl, 0f, size * .006f)
-        drawLayout(canvas, text, rect, fill, rtl, 0f, 0f)
+        drawLayout(canvas, text, rect, outline, rtl)
+        drawLayout(canvas, text, rect, fill, rtl)
     }
 
-    private fun drawLayout(
-        canvas: Canvas,
-        text: String,
-        rect: RectF,
-        paint: TextPaint,
-        rtl: Boolean,
-        dx: Float,
-        dy: Float
-    ) {
+    private fun drawLayout(canvas: Canvas, text: String, rect: RectF, paint: TextPaint, rtl: Boolean) {
         val width = rect.width().toInt().coerceAtLeast(1)
         val builder = StaticLayout.Builder.obtain(text, 0, text.length, paint, width)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
@@ -543,20 +444,12 @@ object HybridImageBronzeCard {
         if (rtl) builder.setTextDirection(TextDirectionHeuristics.RTL)
         val layout = builder.build()
         canvas.save()
-        canvas.translate(rect.left + dx, rect.top + (rect.height() - layout.height) / 2f + dy)
+        canvas.translate(rect.left, rect.top + (rect.height() - layout.height) / 2f)
         layout.draw(canvas)
         canvas.restore()
     }
 
-    private fun box(
-        card: RectF,
-        sx: Float,
-        sy: Float,
-        x1: Float,
-        y1: Float,
-        x2: Float,
-        y2: Float
-    ) = RectF(
+    private fun box(card: RectF, sx: Float, sy: Float, x1: Float, y1: Float, x2: Float, y2: Float) = RectF(
         card.left + x1 * sx,
         card.top + y1 * sy,
         card.left + x2 * sx,
